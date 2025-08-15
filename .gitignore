@@ -98,6 +98,30 @@ ipython_config.py
 #   Similar to Pipfile.lock, it is generally recommended to include uv.lock in version control.
 #   This is especially recommended for binary packages to ensure reproducibility, and is more
 #   commonly ignored for libraries.
+
+# Go specific
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
+
+# Go workspace file
+go.work.sum
+
+# Binary files
+bulbul
+main
+
+# Temporary directories
+tmp/
+tmp
+
+# Air hot reload
+.air.toml.bak
 #uv.lock
 
 # poetry
@@ -210,3 +234,5 @@ __marimo__/
 .terraform
 terraform.tfstate
 terraform.tfstate.backup
+.vscode/launch.json
+/.idea/
