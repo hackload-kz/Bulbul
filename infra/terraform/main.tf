@@ -7,13 +7,13 @@ terraform {
   }
 }
 
+locals {
+  image_id = "73fc8398-34bf-46c4-91fc-53dca6f62d58" # Ubuntu-Server-24.04-LTS-amd64-202508
+}
+
 provider "openstack" {
   auth_url    = "https://auth.pscloud.io/v3/"
   region      = "kz-ala-1"
-}
-
-variable "image_id" {
-  default = "22e935a1-dffe-43d5-939f-98b5a2c92771"
 }
 
 resource "openstack_compute_keypair_v2" "ssh" {
@@ -54,9 +54,9 @@ resource "openstack_networking_router_interface_v2" "router_interface" {
   subnet_id = openstack_networking_subnet_v2.private_subnet.id
 }
 
-resource "openstack_networking_secgroup_v2" "security_group" {
-  name        = "ssh"
-  description = "Allow SSH"
+resource "openstack_networking_secgroup_v2" "default_group" {
+  name        = "bulbul-0default"
+  description = "Allow"
 }
 
 resource "openstack_networking_secgroup_rule_v2" "ssh_rule" {
@@ -66,43 +66,25 @@ resource "openstack_networking_secgroup_rule_v2" "ssh_rule" {
   port_range_min    = 22
   port_range_max    = 22
   remote_ip_prefix  = "0.0.0.0/0"
-  security_group_id = openstack_networking_secgroup_v2.security_group.id
+  security_group_id = openstack_networking_secgroup_v2.default_group.id
 }
 
-# resource "openstack_blockstorage_volume_v3" "disk" {
-#   name                 = "volume_name"
-#   volume_type          = "ceph-ssd" # Available: ceph-ssd, ceph-hdd, ceph-backup
-#   size                 = 25
-#   image_id             = var.image_id
-#   enable_online_resize = true
-# }
+resource "openstack_networking_secgroup_rule_v2" "http_rule" {
+  direction         = "ingress"
+  ethertype         = "IPv4"
+  protocol          = "tcp"
+  port_range_min    = 80
+  port_range_max    = 80
+  remote_ip_prefix  = "0.0.0.0/0"
+  security_group_id = openstack_networking_secgroup_v2.default_group.id
+}
 
-# resource "openstack_compute_instance_v2" "instance" {
-#   name              = "instance_name"
-#   flavor_name       = "d1.ram2cpu1"
-#   key_pair          = openstack_compute_keypair_v2.ssh.name
-#   security_groups   = [openstack_compute_secgroup_v2.security_group.name]
-
-#   network {
-#     uuid = openstack_networking_network_v2.private_network.id
-#   }
-
-#   block_device {
-#     uuid                  = openstack_blockstorage_volume_v3.disk.id
-#     boot_index            = 0
-#     source_type           = "volume"
-#     destination_type      = "volume"
-#     delete_on_termination = false
-#   }
-
-#   depends_on = [
-#     openstack_networking_network_v2.private_network,
-#     openstack_blockstorage_volume_v3.disk
-#   ]
-# }
-
-# resource "openstack_compute_floatingip_associate_v2" "instance_fip_association" {
-#   floating_ip = openstack_networking_floatingip_v2.instance_fip.address
-#   instance_id = openstack_compute_instance_v2.instance.id
-#   fixed_ip    = openstack_compute_instance_v2.instance.access_ip_v4
-# }
+resource "openstack_networking_secgroup_rule_v2" "https_rule" {
+  direction         = "ingress"
+  ethertype         = "IPv4"
+  protocol          = "tcp"
+  port_range_min    = 443
+  port_range_max    = 443
+  remote_ip_prefix  = "0.0.0.0/0"
+  security_group_id = openstack_networking_secgroup_v2.default_group.id
+}

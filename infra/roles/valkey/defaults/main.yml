@@ -1,0 +1,24 @@
+---
+# Valkey configuration
+valkey_port: 6379
+valkey_bind: "0.0.0.0"
+valkey_timeout: 0
+valkey_tcp_keepalive: 300
+valkey_maxclients: 10000
+valkey_maxmemory: "2gb"
+valkey_maxmemory_policy: "allkeys-lru"
+
+# Performance settings
+valkey_tcp_backlog: 511
+valkey_databases: 16
+
+# Security
+valkey_requirepass: ""  # Set password if needed
+valkey_protected_mode: "no"  # Since we bind to 0.0.0.0
+
+# Disable persistence (in-memory only)
+valkey_save: ""
+valkey_stop_writes_on_bgsave_error: "no"
+valkey_rdbcompression: "no"
+valkey_rdbchecksum: "no"
+valkey_appendonly: "no"
