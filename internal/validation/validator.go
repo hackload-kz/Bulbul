@@ -207,7 +207,7 @@ func (v *SpecValidator) validateSeats() error {
 	// PATCH /api/seats/select
 	selectReq := models.SelectSeatRequest{
 		BookingID: 1,
-		SeatID:    1,
+		SeatID:    "1",
 	}
 	
 	resp, err = v.makeRequest("PATCH", "/api/seats/select", selectReq)
@@ -222,7 +222,7 @@ func (v *SpecValidator) validateSeats() error {
 
 	// PATCH /api/seats/release
 	releaseReq := models.ReleaseSeatRequest{
-		SeatID: 1,
+		SeatID: "1",
 	}
 	
 	resp, err = v.makeRequest("PATCH", "/api/seats/release", releaseReq)

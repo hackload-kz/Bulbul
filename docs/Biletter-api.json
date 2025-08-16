@@ -143,15 +143,22 @@
           "status": {
             "type": "string",
             "enum": [
-              "FREE, RESERVED, SOLD"
+              "FREE",
+              "RESERVED",
+              "SOLD"
             ]
+          },
+          "price": {
+            "type": "string",
+            "format": "decimal"
           }
         },
         "required": [
           "id",
           "row",
           "number",
-          "status"
+          "status",
+          "price"
         ]
       },
       "ListSeatsResponse": {
@@ -265,6 +272,25 @@
               "type": "string",
               "format": "date"
             }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 1,
+              "maximum": 20
+            }
           }
         ],
         "responses": {
@@ -352,7 +378,15 @@
           }
         },
         "responses": {
-          "200": {
+          "302": {
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string",
+                  "format": "url"
+                }
+              }
+            },
             "description": "Бронь ожидает подтверждения платежа"
           }
         }

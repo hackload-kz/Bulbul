@@ -237,3 +237,4 @@ terraform.tfstate.backup
 .vscode/launch.json
 /.idea/
 data
+.claude

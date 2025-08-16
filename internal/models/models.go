@@ -13,7 +13,7 @@ func (fb *FlexibleBool) UnmarshalJSON(data []byte) error {
 	// Убираем кавычки
 	str := string(data)
 	str = strings.Trim(str, `"`)
-	
+
 	switch strings.ToLower(str) {
 	case "true", "1", "yes", "on":
 		*fb = true
@@ -32,7 +32,7 @@ func (fb FlexibleBool) Bool() bool {
 
 // CreateEventRequest - модель для создания события
 type CreateEventRequest struct {
-	Title    string      `json:"title" binding:"required"`
+	Title    string       `json:"title" binding:"required"`
 	External FlexibleBool `json:"external,omitempty"`
 }
 
@@ -71,10 +71,11 @@ type CreateBookingResponse struct {
 
 // ListSeatsResponseItem - элемент списка мест
 type ListSeatsResponseItem struct {
-	ID       int64 `json:"id"`
-	Row      int64 `json:"row"`
-	Number   int64 `json:"number"`
-	Reserved bool  `json:"reserved"`
+	ID     string `json:"id"`
+	Row    int64  `json:"row"`
+	Number int64  `json:"number"`
+	Status string `json:"status"`
+	Price  string `json:"price"`
 }
 
 // ListSeatsResponse - список мест
@@ -82,13 +83,13 @@ type ListSeatsResponse []ListSeatsResponseItem
 
 // SelectSeatRequest - модель для выбора места
 type SelectSeatRequest struct {
-	BookingID int64 `json:"booking_id" binding:"required"`
-	SeatID    int64 `json:"seat_id" binding:"required"`
+	BookingID int64  `json:"booking_id" binding:"required"`
+	SeatID    string `json:"seat_id" binding:"required"`
 }
 
 // ReleaseSeatRequest - модель для освобождения места
 type ReleaseSeatRequest struct {
-	SeatID int64 `json:"seat_id" binding:"required"`
+	SeatID string `json:"seat_id" binding:"required"`
 }
 
 // InitiatePaymentRequest - модель для инициации платежа
@@ -99,4 +100,13 @@ type InitiatePaymentRequest struct {
 // CancelBookingRequest - модель для отмены бронирования
 type CancelBookingRequest struct {
 	BookingID int64 `json:"booking_id" binding:"required"`
+}
+
+// PaymentNotificationPayload - модель для webhook уведомлений от платежного шлюза
+type PaymentNotificationPayload struct {
+	PaymentID string                 `json:"paymentId"`
+	Status    string                 `json:"status"`
+	TeamSlug  string                 `json:"teamSlug"`
+	Timestamp string                 `json:"timestamp"`
+	Data      map[string]interface{} `json:"data"`
 }
