@@ -1,0 +1,45 @@
+---
+- name: Provision Load Balancer
+  hosts: load_balancer
+  become: yes
+  gather_facts: yes
+  
+  roles:
+    - load_balancer
+
+  post_tasks:
+    - name: Display load balancer status
+      debug:
+        msg: |
+          Load balancer provisioned successfully!
+          Domain: {{ domain_name }}
+          Public IP: {{ ansible_host }}
+          Nginx status: {{ ansible_facts['services']['nginx']['state'] | default('unknown') }}
+
+- name: Provision Backend Servers
+  hosts: backend_servers
+  become: yes
+  gather_facts: yes
+  
+  tasks:
+    - name: Update package cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 86400
+    
+    - name: Install basic packages
+      apt:
+        name:
+          - htop
+          - curl
+          - wget
+        state: present
+    
+    - name: Display backend server info
+      debug:
+        msg: |
+          Backend server ready for application deployment
+          Private IP: {{ ansible_host }}
+          Gateway: Load balancer ({{ hostvars[groups['load_balancer'][0]]['ansible_host'] }})
+  
+  tags: backend

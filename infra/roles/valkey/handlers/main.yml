@@ -1,0 +1,14 @@
+---
+- name: reload systemd
+  systemd:
+    daemon_reload: yes
+
+- name: restart valkey
+  systemd:
+    name: valkey
+    state: restarted
+
+- name: stop valkey
+  systemd:
+    name: valkey
+    state: stopped

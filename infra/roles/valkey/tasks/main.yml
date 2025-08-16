@@ -1,0 +1,81 @@
+---
+- name: Add Valkey APT repository key
+  apt_key:
+    url: https://download.valkey.io/valkey-signing-key.gpg
+    state: present
+
+- name: Add Valkey APT repository
+  apt_repository:
+    repo: "deb https://download.valkey.io/deb {{ ansible_distribution_release }} main"
+    state: present
+    update_cache: yes
+
+- name: Install Valkey
+  apt:
+    name: valkey
+    state: present
+    update_cache: yes
+
+- name: Create valkey user
+  user:
+    name: valkey
+    system: yes
+    shell: /bin/false
+    home: /var/lib/valkey
+    create_home: yes
+
+- name: Create Valkey directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: valkey
+    group: valkey
+    mode: '0755'
+  loop:
+    - /etc/valkey
+    - /var/lib/valkey
+    - /var/log/valkey
+
+- name: Configure Valkey
+  template:
+    src: valkey.conf.j2
+    dest: /etc/valkey/valkey.conf
+    owner: valkey
+    group: valkey
+    mode: '0640'
+    backup: yes
+  notify: restart valkey
+
+- name: Create Valkey systemd service
+  copy:
+    content: |
+      [Unit]
+      Description=Advanced key-value store
+      After=network.target
+      Documentation=https://valkey.io/
+
+      [Service]
+      Type=notify
+      ExecStart=/usr/bin/valkey-server /etc/valkey/valkey.conf
+      ExecStop=/bin/kill -s QUIT $MAINPID
+      TimeoutStopSec=0
+      Restart=always
+      User=valkey
+      Group=valkey
+      RuntimeDirectory=valkey
+      RuntimeDirectoryMode=0755
+
+      [Install]
+      WantedBy=multi-user.target
+    dest: /etc/systemd/system/valkey.service
+    mode: '0644'
+  notify:
+    - reload systemd
+    - restart valkey
+
+- name: Start and enable Valkey
+  systemd:
+    name: valkey
+    state: started
+    enabled: yes
+    daemon_reload: yes

@@ -1,0 +1,23 @@
+#!/bin/bash
+set -e
+
+echo "Waiting for nginx to start..."
+sleep 10
+
+echo "Creating web root for Let's Encrypt challenges..."
+mkdir -p /var/www/html/.well-known/acme-challenge
+chown -R www-data:www-data /var/www/html
+
+echo "Obtaining SSL certificate for {{ domain_name }}..."
+{% if ssl_staging %}
+certbot --nginx -d {{ domain_name }} --non-interactive --agree-tos --email {{ ssl_email }} --staging --no-redirect
+{% else %}
+certbot --nginx -d {{ domain_name }} --non-interactive --agree-tos --email {{ ssl_email }} --no-redirect
+{% endif %}
+
+echo "Certificate obtained successfully!"
+
+echo "Setting up automatic certificate renewal..."
+echo "0 12 * * * /usr/bin/certbot renew --quiet" | crontab -
+
+echo "SSL setup completed successfully!"
