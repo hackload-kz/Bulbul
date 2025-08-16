@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
-	"bulbul/internal/models"
-	"bulbul/internal/repository"
 	"bulbul/internal/external"
 	"bulbul/internal/messaging"
+	"bulbul/internal/middleware"
+	"bulbul/internal/models"
+	"bulbul/internal/repository"
+
+	"github.com/google/uuid"
 )
 
 type BookingService struct {
@@ -45,7 +47,12 @@ func (s *BookingService) Create(ctx context.Context, req *models.CreateBookingRe
 		EventID:       req.EventID,
 		Status:        "CREATED",
 		PaymentStatus: "PENDING",
-		TotalAmount:   new(int64), // Will be calculated when seats are added
+		TotalAmount:   &[]string{"0"}[0], // Will be calculated when seats are added
+	}
+
+	// Set user_id from request context if present
+	if id, ok := middleware.UserIDFromContext(ctx); ok {
+		booking.UserID = &id
 	}
 
 	err = s.bookingRepo.Create(ctx, booking)
@@ -129,7 +136,8 @@ func (s *BookingService) InitiatePayment(ctx context.Context, req *models.Initia
 		booking.PaymentStatus = "INITIATED"
 		booking.PaymentID = &paymentResp.PaymentID
 		booking.OrderID = &orderID
-		booking.TotalAmount = &totalAmount
+		totalAmountStr := fmt.Sprintf("%d", totalAmount)
+		booking.TotalAmount = &totalAmountStr
 
 		err = s.bookingRepo.Update(ctx, booking)
 		if err != nil {
@@ -156,7 +164,8 @@ func (s *BookingService) InitiatePayment(ctx context.Context, req *models.Initia
 		// For external events (ID=1), just mark as payment not required
 		booking.PaymentStatus = "COMPLETED"
 		booking.Status = "CONFIRMED"
-		booking.TotalAmount = &totalAmount
+		totalAmountStr := fmt.Sprintf("%d", totalAmount)
+		booking.TotalAmount = &totalAmountStr
 
 		err = s.bookingRepo.Update(ctx, booking)
 		if err != nil {
@@ -187,7 +196,7 @@ func (s *BookingService) Cancel(ctx context.Context, req *models.CancelBookingRe
 	for _, seat := range seats {
 		if err := s.seatRepo.ReleaseSeat(ctx, seat.ID); err != nil {
 			// Log error but continue
-			fmt.Printf("Failed to release seat %d: %v", seat.ID, err)
+			fmt.Printf("Failed to release seat %s: %v", seat.ID, err)
 		}
 	}
 

@@ -5,9 +5,10 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/gin-gonic/gin"
 	"bulbul/internal/models"
 	"bulbul/internal/service"
+
+	"github.com/gin-gonic/gin"
 )
 
 type Handlers struct {
@@ -47,17 +48,17 @@ func (h *Handlers) CreateEvent(c *gin.Context) {
 func (h *Handlers) ListEvents(c *gin.Context) {
 	query := c.Query("query")
 	date := c.Query("date")
-	
+
 	// Get pagination parameters
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "10"))
-	
+
 	// Validate pagination parameters
 	if page < 1 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "page must be >= 1"})
 		return
 	}
-	
+
 	if pageSize < 1 || pageSize > 20 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "pageSize must be between 1 and 20"})
 		return
@@ -97,8 +98,12 @@ func (h *Handlers) CreateBooking(c *gin.Context) {
 // ListBookings - GET /api/bookings
 // Получить список бронирований
 func (h *Handlers) ListBookings(c *gin.Context) {
-	// For now, use a dummy user ID. In real implementation, get from auth context
-	userID := int64(1)
+	userID := int64(1) // Default dummy user ID
+	if v, exists := c.Get("user_id"); exists {
+		if id, ok := v.(int64); ok {
+			userID = id
+		}
+	}
 
 	response, err := h.services.Bookings.List(c.Request.Context(), userID)
 	if err != nil {
