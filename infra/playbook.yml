@@ -6,15 +6,16 @@
   
   roles:
     - load_balancer
+  tags: load_balancer
 
-  post_tasks:
-    - name: Display load balancer status
-      debug:
-        msg: |
-          Load balancer provisioned successfully!
-          Domain: {{ domain_name }}
-          Public IP: {{ ansible_host }}
-          Nginx status: {{ ansible_facts['services']['nginx']['state'] | default('unknown') }}
+- name: Provision postgresql
+  hosts: postgres
+  become: yes
+  gather_facts: yes
+  
+  roles:
+    - postgresql
+  tags: postgresql
 
 - name: Provision Backend Servers
   hosts: backend_servers

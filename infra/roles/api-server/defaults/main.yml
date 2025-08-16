@@ -1,0 +1,58 @@
+---
+# API Server configuration
+api_server_version: "latest"
+api_server_port: "8081"
+api_server_user: "bulbul"
+api_server_group: "bulbul"
+api_server_home: "/opt/bulbul"
+api_server_binary_path: "{{ api_server_home }}/api-server"
+api_server_config_dir: "/etc/bulbul"
+
+# Go configuration
+go_version: "1.21"
+go_install_dir: "/usr/local"
+
+# Service configuration
+api_server_service_name: "bulbul-api"
+api_server_restart_policy: "always"
+api_server_restart_sec: "5"
+
+# Application configuration
+gin_mode: "release"
+log_level: "info"
+log_format: "json"
+
+# Database configuration (PostgreSQL)
+postgres_host: "{{ hostvars[groups['postgres'][0]]['ansible_default_ipv4']['address'] }}"
+postgres_port: "5432"
+postgres_user: "postgres"
+postgres_password: "postgres_admin_123"
+postgres_database: "bulbul"
+postgres_sslmode: "disable"
+
+# Cache configuration (Valkey)
+valkey_host: "{{ hostvars[groups['valkey'][0]]['ansible_default_ipv4']['address'] }}"
+valkey_port: "6379"
+valkey_password: ""
+
+# NATS configuration
+nats_url: "nats://{{ hostvars[groups['nats'][0]]['ansible_default_ipv4']['address'] }}:4222"
+nats_cluster_id: "bulbul-cluster"
+nats_client_id: "bulbul-api"
+
+# External services
+ticketing_service_url: "https://hub.hackload.kz/event-provider/common"
+payment_gateway_url: "https://hub.hackload.kz/payment-provider/common"
+payment_team_slug: "bulbul"
+payment_password: "hackload2025"
+service_timeout_sec: "30"
+
+# Source code repository
+api_server_repo_url: "https://github.com/hackload-kz/bulbul.git"
+api_server_repo_branch: "main"
+api_server_build_dir: "/tmp/bulbul-build"
+
+# Logging
+log_file: "/var/log/{{ api_server_service_name }}.log"
+log_max_size: "100MB"
+log_max_files: "5"

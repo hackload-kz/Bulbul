@@ -1,0 +1,40 @@
+[Unit]
+Description=Bulbul API Server
+Documentation=https://github.com/hackload-kz/bulbul
+After=network.target postgresql.service nats.service valkey.service
+Wants=postgresql.service nats.service valkey.service
+
+[Service]
+Type=simple
+User={{ api_server_user }}
+Group={{ api_server_group }}
+WorkingDirectory={{ api_server_home }}
+ExecStart={{ api_server_binary_path }}
+EnvironmentFile={{ api_server_config_dir }}/api-server.env
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths={{ api_server_home }} /var/log/bulbul /tmp
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+
+# Restart policy
+Restart={{ api_server_restart_policy }}
+RestartSec={{ api_server_restart_sec }}
+KillMode=mixed
+TimeoutStopSec=30
+
+# Resource limits
+LimitNOFILE=65535
+LimitNPROC=4096
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier={{ api_server_service_name }}
+
+[Install]
+WantedBy=multi-user.target

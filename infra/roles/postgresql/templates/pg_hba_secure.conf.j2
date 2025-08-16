@@ -1,9 +1,10 @@
 # PostgreSQL Client Authentication Configuration File
+# Secure version with password authentication for postgres user
 
 # TYPE  DATABASE        USER            ADDRESS                 METHOD
 
 # "local" is for Unix domain socket connections only
-local   all             postgres                                peer
+local   all             postgres                                scram-sha-256
 local   all             all                                     peer
 
 # IPv4 local connections:

@@ -1,0 +1,24 @@
+---
+- name: reload systemd
+  systemd:
+    daemon_reload: yes
+
+- name: restart api-server
+  systemd:
+    name: "{{ api_server_service_name }}"
+    state: restarted
+
+- name: stop api-server
+  systemd:
+    name: "{{ api_server_service_name }}"
+    state: stopped
+
+- name: start api-server
+  systemd:
+    name: "{{ api_server_service_name }}"
+    state: started
+
+- name: reload api-server
+  systemd:
+    name: "{{ api_server_service_name }}"
+    state: reloaded
