@@ -1,0 +1,14 @@
+---
+domain_name: "bulbul.hub.hackload.kz"
+ssl_email: "admin@hackload.kz"
+setup_ssl: true
+ssl_staging: true  # Use Let's Encrypt staging for testing
+
+# Backend servers configuration
+backend_servers:
+  - { host: "127.0.0.1", port: "8080" }  # Placeholder
+
+# Nginx performance settings
+worker_processes: "auto"
+worker_connections: 65535
+client_max_body_size: "100M"

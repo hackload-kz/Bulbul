@@ -1,0 +1,46 @@
+---
+# PostgreSQL version
+postgresql_version: "16"
+
+# Database configuration
+postgresql_database: "bulbul"
+postgresql_user: "bulbul"
+postgresql_password: "bulbul123"
+
+# Connection settings
+postgresql_port: 5432
+postgresql_listen_addresses: "0.0.0.0"
+postgresql_max_connections: 200
+
+# Memory settings (adjust based on available RAM)
+postgresql_shared_buffers: "256MB"
+postgresql_effective_cache_size: "1GB"
+postgresql_work_mem: "4MB"
+postgresql_maintenance_work_mem: "64MB"
+
+# WAL settings
+postgresql_wal_buffers: "16MB"
+postgresql_checkpoint_completion_target: 0.9
+postgresql_max_wal_size: "1GB"
+postgresql_min_wal_size: "80MB"
+
+# Query planner
+postgresql_random_page_cost: 1.1
+postgresql_effective_io_concurrency: 200
+
+# Logging
+postgresql_log_destination: "stderr"
+postgresql_logging_collector: "on"
+postgresql_log_directory: "log"
+postgresql_log_filename: "postgresql-%Y-%m-%d_%H%M%S.log"
+postgresql_log_min_duration_statement: 1000
+
+# Performance monitoring
+postgresql_track_activities: "on"
+postgresql_track_counts: "on"
+postgresql_track_io_timing: "on"
+postgresql_track_functions: "all"
+
+# Security
+postgresql_ssl: "off"  # Enable if needed
+postgresql_authentication_timeout: "1min"

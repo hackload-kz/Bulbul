@@ -1,0 +1,58 @@
+# Valkey configuration file
+
+# Network
+bind {{ valkey_bind }}
+port {{ valkey_port }}
+tcp-backlog {{ valkey_tcp_backlog }}
+timeout {{ valkey_timeout }}
+tcp-keepalive {{ valkey_tcp_keepalive }}
+
+# General
+daemonize no
+supervised systemd
+pidfile /var/run/valkey/valkey-server.pid
+loglevel notice
+logfile /var/log/valkey/valkey.log
+databases {{ valkey_databases }}
+
+# Security
+{% if valkey_requirepass %}
+requirepass {{ valkey_requirepass }}
+{% endif %}
+protected-mode {{ valkey_protected_mode }}
+
+# Memory management
+maxclients {{ valkey_maxclients }}
+maxmemory {{ valkey_maxmemory }}
+maxmemory-policy {{ valkey_maxmemory_policy }}
+
+# Persistence (DISABLED for in-memory only)
+{% if valkey_save %}
+save {{ valkey_save }}
+{% else %}
+save ""
+{% endif %}
+stop-writes-on-bgsave-error {{ valkey_stop_writes_on_bgsave_error }}
+rdbcompression {{ valkey_rdbcompression }}
+rdbchecksum {{ valkey_rdbchecksum }}
+dbfilename dump.rdb
+dir /var/lib/valkey
+
+# AOF (DISABLED)
+appendonly {{ valkey_appendonly }}
+
+# Performance optimizations
+# Disable background saving
+save ""
+
+# Optimize for memory usage
+hash-max-ziplist-entries 512
+hash-max-ziplist-value 64
+list-max-ziplist-size -2
+list-compress-depth 0
+set-max-intset-entries 512
+zset-max-ziplist-entries 128
+zset-max-ziplist-value 64
+
+# Network optimizations
+so-keepalive yes

@@ -1,0 +1,41 @@
+# Upstream backend servers
+upstream backend {
+    least_conn;
+{% for server in backend_servers %}
+    server {{ server.host }}:{{ server.port }} max_fails=3 fail_timeout=30s;
+{% endfor %}
+}
+
+# HTTP server (initial setup for certbot)
+server {
+    listen 80;
+    server_name {{ domain_name }};
+
+    # Let's Encrypt challenge location
+    location /.well-known/acme-challenge/ {
+        root /var/www/html;
+        try_files $uri =404;
+    }
+
+    # Proxy configuration for other requests
+    location / {
+        proxy_pass http://backend;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+        proxy_read_timeout 300s;
+        proxy_connect_timeout 75s;
+    }
+
+    # Health check endpoint
+    location /health {
+        access_log off;
+        return 200 "healthy\n";
+        add_header Content-Type text/plain;
+    }
+}

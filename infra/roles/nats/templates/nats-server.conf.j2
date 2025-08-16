@@ -1,0 +1,88 @@
+# NATS Server Configuration
+
+# Server identity
+server_name: "{{ nats_server_name }}"
+
+# Network configuration
+host: "{{ nats_bind }}"
+port: {{ nats_port }}
+
+# HTTP monitoring
+http_port: {{ nats_http_port }}
+{% if nats_monitoring_enabled %}
+http: "{{ nats_bind }}:{{ nats_http_port }}"
+{% endif %}
+
+# Performance settings
+max_connections: {{ nats_max_connections }}
+max_subscriptions: {{ nats_max_subscriptions }}
+max_payload: {{ nats_max_payload }}
+max_pending: {{ nats_max_pending }}
+
+# Logging
+log_file: "/var/log/nats/nats-server.log"
+logtime: true
+debug: false
+trace: false
+
+# PID file
+pid_file: "/var/run/nats/nats-server.pid"
+
+{% if nats_jetstream_enabled %}
+# JetStream configuration
+jetstream {
+    # Storage directory
+    store_dir: "{{ nats_jetstream_store_dir }}"
+    
+    # Memory storage
+    max_memory_store: {{ nats_jetstream_max_memory_store }}
+    
+    # File storage
+    max_file_store: {{ nats_jetstream_max_file_store }}
+    
+    # Domain (optional)
+    # domain: "hub"
+}
+{% endif %}
+
+# Single server setup (no clustering)
+# For clustering, uncomment and configure:
+# cluster {
+#     name: "{{ nats_cluster_name }}"
+#     listen: "{{ nats_bind }}:6222"
+#     routes = [
+#         "nats://{{ nats_bind }}:6222"
+#     ]
+# }
+
+# System account (for monitoring and management)
+system_account: SYS
+
+# Accounts (optional - for multi-tenancy)
+accounts {
+    SYS {
+        users [
+            { user: sys, password: sys }
+        ]
+    }
+    
+    APP {
+        users [
+            { user: app, password: app }
+        ]
+        
+        {% if nats_jetstream_enabled %}
+        jetstream: enabled
+        {% endif %}
+    }
+}
+
+# Default account
+default_account: APP
+
+# Connection limits
+ping_interval: "2m"
+ping_max: 2
+
+# Write deadline
+write_deadline: "10s"
