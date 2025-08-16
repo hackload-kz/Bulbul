@@ -3,7 +3,7 @@
 # TYPE  DATABASE        USER            ADDRESS                 METHOD
 
 # "local" is for Unix domain socket connections only
-local   all             postgres                                peer
+local   all             postgres                                scram-sha-256
 local   all             all                                     peer
 
 # IPv4 local connections:
@@ -14,6 +14,11 @@ host    all             all             ::1/128                 scram-sha-256
 host    all             all             10.0.0.0/8              scram-sha-256
 host    all             all             172.16.0.0/12           scram-sha-256
 host    all             all             192.168.0.0/16          scram-sha-256
+
+# Allow postgres superuser from private networks (for API servers)
+host    all             postgres        10.0.0.0/8              scram-sha-256
+host    all             postgres        172.16.0.0/12           scram-sha-256
+host    all             postgres        192.168.0.0/16          scram-sha-256
 
 # Allow application user from anywhere (adjust as needed for security)
 host    {{ postgresql_database }}    {{ postgresql_user }}    0.0.0.0/0               scram-sha-256

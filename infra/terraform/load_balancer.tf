@@ -1,4 +1,3 @@
-
 resource "openstack_blockstorage_volume_v3" "lb_disk" {
   name                 = "lb-volume"
   volume_type          = "ceph-ssd"
@@ -12,7 +11,7 @@ resource "openstack_compute_instance_v2" "lb" {
   flavor_name       = "d1.ram1cpu1"
   key_pair          = openstack_compute_keypair_v2.ssh.name
 
-  user_data       = file("${path.module}/resources/lb-cloud-init.yml")
+  user_data       = file("${path.module}/resources/cloud-init.yml")
 
   network {
     port = openstack_networking_port_v2.lb_port.id
@@ -35,16 +34,4 @@ resource "openstack_networking_port_v2" "lb_port" {
 resource "openstack_networking_floatingip_associate_v2" "instance_fip_association" {
   floating_ip = openstack_networking_floatingip_v2.instance_fip.address
   port_id     = openstack_networking_port_v2.lb_port.id
-}
-
-resource "local_file" "ansible_inventory" {
-  content = templatefile("${path.module}/templates/inventories.ini.tpl", {
-    load_balancer_public_ip  = openstack_networking_floatingip_v2.instance_fip.address
-    load_balancer_private_ip = openstack_networking_port_v2.lb_port.all_fixed_ips[0]
-  })
-  filename = "${path.module}/../inventories.ini"
-
-  depends_on = [
-    openstack_networking_floatingip_associate_v2.instance_fip_association
-  ]
 }

@@ -10,7 +10,10 @@ run = "go run cmd/api/main.go"
 run = "go run cmd/consumers/main.go"
 
 [tasks.load-data]
-run = "./load-data.sh"
+run = [
+    "psql -h localhost -p 5432 -U bulbul -d bulbul -f data/users.sql",
+    "psql -h localhost -p 5432 -U bulbul -d bulbul -f data/events.sql"
+]
 
 [tasks.flush-data]
 run = [

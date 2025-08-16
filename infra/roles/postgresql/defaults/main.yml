@@ -44,3 +44,16 @@ postgresql_track_functions: "all"
 # Security
 postgresql_ssl: "off"  # Enable if needed
 postgresql_authentication_timeout: "1min"
+
+# Postgres superuser configuration (for API server access)
+postgresql_postgres_password: "postgres_admin_123"
+
+# Data loading configuration
+postgresql_load_data: true
+postgresql_data_dir: "/tmp/postgresql_data"
+
+# Data source URLs
+postgresql_data_sources:
+  users_sql: "https://github.com/hackload-kz/data/releases/download/2025-08-15/users.sql"
+  events_sql: "https://github.com/hackload-kz/data/releases/download/2025-08-15/events.sql"
+  events_archive_zip: "https://github.com/hackload-kz/data/releases/download/2025-08-15/events_archive.sql.zip"

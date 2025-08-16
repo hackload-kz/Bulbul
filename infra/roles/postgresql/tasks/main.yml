@@ -61,6 +61,14 @@
     name: postgresql
     state: restarted
 
+- name: Set password for postgres superuser
+  postgresql_user:
+    name: postgres
+    password: "{{ postgresql_postgres_password }}"
+    encrypted: yes
+    state: present
+  become_user: postgres
+
 - name: Create application database
   postgresql_db:
     name: "{{ postgresql_database }}"
@@ -96,6 +104,29 @@
     - uuid-ossp
   ignore_errors: yes  # Some extensions might not be available
 
+- name: Create schemas
+  postgresql_schema:
+    database: "{{ postgresql_database }}"
+    name: "{{ item }}"
+    state: present
+  become_user: postgres
+  loop:
+    - users
+    - events_archive
+
+- name: Grant schema privileges to application user
+  postgresql_privs:
+    database: "{{ postgresql_database }}"
+    roles: "{{ postgresql_user }}"
+    privs: ALL
+    type: schema
+    objs: "{{ item }}"
+    state: present
+  become_user: postgres
+  loop:
+    - users
+    - events_archive
+
 - name: Create indexes and optimizations script
   copy:
     content: |
@@ -130,3 +161,92 @@
       }
     dest: /etc/logrotate.d/postgresql
     mode: '0644'
+
+# Data loading tasks
+- name: Create data directory
+  file:
+    path: "{{ postgresql_data_dir }}"
+    state: directory
+    mode: '0755'
+  when: postgresql_load_data
+
+- name: Download users.sql
+  get_url:
+    url: "{{ postgresql_data_sources.users_sql }}"
+    dest: "{{ postgresql_data_dir }}/users.sql"
+    mode: '0644'
+  when: postgresql_load_data
+
+- name: Download events.sql
+  get_url:
+    url: "{{ postgresql_data_sources.events_sql }}"
+    dest: "{{ postgresql_data_dir }}/events.sql"
+    mode: '0644'
+  when: postgresql_load_data
+
+- name: Download events_archive.sql.zip
+  get_url:
+    url: "{{ postgresql_data_sources.events_archive_zip }}"
+    dest: "{{ postgresql_data_dir }}/events_archive.sql.zip"
+    mode: '0644'
+  when: postgresql_load_data
+
+- name: Install unzip for extracting archive
+  apt:
+    name: unzip
+    state: present
+  when: postgresql_load_data
+
+- name: Extract events_archive.sql.zip
+  unarchive:
+    src: "{{ postgresql_data_dir }}/events_archive.sql.zip"
+    dest: "{{ postgresql_data_dir }}"
+    remote_src: yes
+    creates: "{{ postgresql_data_dir }}/events_archive.sql"
+  when: postgresql_load_data
+
+- name: Check if users table exists
+  postgresql_query:
+    db: "{{ postgresql_database }}"
+    query: "SELECT to_regclass('public.users')"
+  become_user: postgres
+  register: users_table_check
+  when: postgresql_load_data
+
+- name: Load users.sql data
+  postgresql_db:
+    name: "{{ postgresql_database }}"
+    state: restore
+    target: "{{ postgresql_data_dir }}/users.sql"
+  become_user: postgres
+  when: postgresql_load_data and users_table_check.query_result[0][0] is none
+
+- name: Check if events_archive table exists
+  postgresql_query:
+    db: "{{ postgresql_database }}"
+    query: "SELECT to_regclass('public.events_archive')"
+  become_user: postgres
+  register: events_table_check
+  when: postgresql_load_data
+
+- name: Load events.sql data
+  postgresql_db:
+    name: "{{ postgresql_database }}"
+    state: restore
+    target: "{{ postgresql_data_dir }}/events.sql"
+  become_user: postgres
+  when: postgresql_load_data and events_table_check.query_result[0][0] is none
+
+- name: Load events_archive.sql data
+  postgresql_db:
+    name: "{{ postgresql_database }}"
+    state: restore
+    target: "{{ postgresql_data_dir }}/events_archive.sql"
+  become_user: postgres
+  when: postgresql_load_data and events_table_check.query_result[0][0] is none
+
+- name: Clean up downloaded files
+  file:
+    path: "{{ postgresql_data_dir }}"
+    state: absent
+  when: postgresql_load_data
