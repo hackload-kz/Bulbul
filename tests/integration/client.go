@@ -12,6 +12,12 @@ import (
 	"bulbul/internal/models"
 )
 
+// Test user credentials - should match users from users.sql data
+const (
+	TestUserEmail    = "aysultan_talgat_1@fest.tix" // Default test user
+	TestUserPassword = "/8eC$AD>"                   // Default test password
+)
+
 // TestClient provides methods for testing the API
 type TestClient struct {
 	BaseURL    string
@@ -47,6 +53,9 @@ func (c *TestClient) makeRequest(t *testing.T, method, path string, body interfa
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
+
+	// Add Basic Auth for all API requests
+	req.SetBasicAuth(TestUserEmail, TestUserPassword)
 
 	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
