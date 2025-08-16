@@ -51,7 +51,7 @@ type Booking struct {
 	UserID        *int64    `json:"user_id" db:"user_id"`
 	Status        string    `json:"status" db:"status"`
 	PaymentStatus string    `json:"payment_status" db:"payment_status"`
-	TotalAmount   *int64    `json:"total_amount" db:"total_amount"`
+	TotalAmount   *string   `json:"total_amount" db:"total_amount"`
 	PaymentID     *string   `json:"payment_id" db:"payment_id"`
 	OrderID       *string   `json:"order_id" db:"order_id"`
 	CreatedAt     time.Time `json:"created_at" db:"created_at"`

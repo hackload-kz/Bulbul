@@ -24,6 +24,7 @@ type Server struct {
 	db       *database.DB
 	nats     *messaging.NATSClient
 	services *service.Services
+	repos    *repository.Repositories
 }
 
 // NewServer создает новый экземпляр сервера
@@ -72,6 +73,7 @@ func NewServer(cfg *config.Config) *Server {
 		db:       db,
 		nats:     natsClient,
 		services: services,
+		repos:    repos,
 	}
 
 	// Настраиваем роуты
@@ -87,6 +89,8 @@ func (s *Server) setupRoutes() {
 
 	// API routes
 	api := s.router.Group("/api")
+	// Обязательная Basic Auth для всех API роутов
+	api.Use(middleware.BasicAuth(s.repos.Users))
 	{
 		// Events endpoints
 		events := api.Group("/events")
