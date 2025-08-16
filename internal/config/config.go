@@ -3,6 +3,11 @@ package config
 import (
 	"os"
 	"strconv"
+	"time"
+
+	"bulbul/internal/database"
+	"bulbul/internal/external"
+	"bulbul/internal/messaging"
 )
 
 // Config содержит конфигурацию приложения
@@ -11,6 +16,11 @@ type Config struct {
 	GinMode   string
 	LogLevel  string
 	LogFormat string
+
+	Database  database.Config
+	NATS      messaging.Config
+	Ticketing external.TicketingConfig
+	Payment   external.PaymentConfig
 }
 
 // Load загружает конфигурацию из переменных окружения
@@ -20,6 +30,33 @@ func Load() *Config {
 		GinMode:   getEnv("GIN_MODE", "debug"),
 		LogLevel:  getEnv("LOG_LEVEL", "info"),
 		LogFormat: getEnv("LOG_FORMAT", "json"),
+
+		Database: database.Config{
+			Host:     getEnv("DB_HOST", "localhost"),
+			Port:     getEnvInt("DB_PORT", 5432),
+			User:     getEnv("DB_USER", "bulbul"),
+			Password: getEnv("DB_PASSWORD", "bulbul123"),
+			DBName:   getEnv("DB_NAME", "bulbul"),
+			SSLMode:  getEnv("DB_SSLMODE", "disable"),
+		},
+
+		NATS: messaging.Config{
+			URL:       getEnv("NATS_URL", "nats://localhost:4222"),
+			ClusterID: getEnv("NATS_CLUSTER_ID", "bulbul"),
+			ClientID:  getEnv("NATS_CLIENT_ID", "biletter-api"),
+		},
+
+		Ticketing: external.TicketingConfig{
+			BaseURL: getEnv("TICKETING_SERVICE_URL", "https://hub.hackload.kz/event-provider/common"),
+			Timeout: time.Duration(getEnvInt("TICKETING_TIMEOUT_SEC", 30)) * time.Second,
+		},
+
+		Payment: external.PaymentConfig{
+			BaseURL:  getEnv("PAYMENT_GATEWAY_URL", "https://hub.hackload.kz/payment-provider/common"),
+			TeamSlug: getEnv("PAYMENT_TEAM_SLUG", ""),
+			Password: getEnv("PAYMENT_PASSWORD", ""),
+			Timeout:  time.Duration(getEnvInt("PAYMENT_TIMEOUT_SEC", 30)) * time.Second,
+		},
 	}
 }
 

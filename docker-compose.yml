@@ -1,16 +1,77 @@
-version: '3.8'
-
 services:
-  bulbul-api:
-    build: .
+  # bulbul-api:
+  #   build: .
+  #   ports:
+  #     - "8081:8081"
+  #   environment:
+  #     - GIN_MODE=release
+  #     - DB_HOST=postgres
+  #     - DB_PORT=5432
+  #     - DB_USER=bulbul
+  #     - DB_PASSWORD=bulbul123
+  #     - DB_NAME=bulbul
+  #     - DB_SSLMODE=disable
+  #     - NATS_URL=nats://nats:4222
+  #     - NATS_CLUSTER_ID=bulbul
+  #     - NATS_CLIENT_ID=biletter-api
+  #   depends_on:
+  #     - postgres
+  #     - nats
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/health"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #     start_period: 40s
+
+  # bulbul-consumers:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.consumers
+  #   environment:
+  #     - DB_HOST=postgres
+  #     - DB_PORT=5432
+  #     - DB_USER=bulbul
+  #     - DB_PASSWORD=bulbul123
+  #     - DB_NAME=bulbul
+  #     - DB_SSLMODE=disable
+  #     - NATS_URL=nats://nats:4222
+  #     - NATS_CLUSTER_ID=bulbul
+  #     - NATS_CLIENT_ID=biletter-consumers
+  #   depends_on:
+  #     - postgres
+  #     - nats
+  #     - bulbul-api
+  #   restart: unless-stopped
+
+  valkey:
+    image: valkey/valkey:8-alpine
     ports:
-      - "8081:8081"
-    environment:
-      - GIN_MODE=release
+      - "6379:6379"
+    volumes:
+      - ./data/valkey:/data
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/api/events"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+    command: valkey-server --appendonly yes
+
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: bulbul
+      POSTGRES_USER: bulbul
+      POSTGRES_PASSWORD: bulbul123
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  nats:
+    image: nats-streaming:0.25.6-alpine
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    volumes:
+      - ./data/nats:/data
+    restart: unless-stopped
+    command: ["-p", "4222", "-m", "8222", "-hbi", "5s", "-hbt", "5s", "-hbf", "2", "-SD", "-cid", "bulbul", "--store", "file", "--dir", "/data"]

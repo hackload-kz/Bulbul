@@ -2,3 +2,23 @@
 go = "1.24.1"
 python = "latest"
 terraform = "1.12.2"
+
+[tasks.api]
+run = "go run cmd/api/main.go"
+
+[tasks.consumers]
+run = "go run cmd/consumers/main.go"
+
+[tasks.load-data]
+run = [
+    "psql -h localhost -p 5432 -U bulbul -d bulbul -f data/users.sql",
+    "psql -h localhost -p 5432 -U bulbul -d bulbul -f data/events.sql"
+]
+
+[tasks.flush-data]
+run = [
+    "docker-compose down",
+    "rm -rf ./data/postgres/*",
+    "rm -rf ./data/valkey/*",
+    "docker-compose up -d"
+]

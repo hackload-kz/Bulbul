@@ -1,0 +1,151 @@
+package repository
+
+import (
+	"context"
+	"database/sql"
+	"fmt"
+	"time"
+
+	"bulbul/internal/database"
+	"bulbul/internal/models"
+)
+
+type EventRepository struct {
+	db *database.DB
+}
+
+func NewEventRepository(db *database.DB) *EventRepository {
+	return &EventRepository{db: db}
+}
+
+func (r *EventRepository) Create(ctx context.Context, event *models.Event) error {
+	query := `
+		INSERT INTO events_archive (title, description, type, datetime_start, provider, external, total_seats)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		RETURNING id, created_at, updated_at`
+
+	err := r.db.QueryRowContext(ctx, query,
+		event.Title,
+		event.Description,
+		event.Type,
+		event.DatetimeStart,
+		event.Provider,
+		event.External,
+		event.TotalSeats,
+	).Scan(&event.ID, &event.CreatedAt, &event.UpdatedAt)
+
+	return err
+}
+
+func (r *EventRepository) GetByID(ctx context.Context, id int64) (*models.Event, error) {
+	event := &models.Event{}
+	query := `
+		SELECT id, title, description, type, datetime_start, provider, external, total_seats, created_at, updated_at
+		FROM events_archive
+		WHERE id = $1`
+
+	err := r.db.QueryRowContext(ctx, query, id).Scan(
+		&event.ID,
+		&event.Title,
+		&event.Description,
+		&event.Type,
+		&event.DatetimeStart,
+		&event.Provider,
+		&event.External,
+		&event.TotalSeats,
+		&event.CreatedAt,
+		&event.UpdatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+
+	return event, err
+}
+
+func (r *EventRepository) List(ctx context.Context, query string, date string, page, pageSize int) ([]models.Event, error) {
+	var events []models.Event
+	var args []interface{}
+	argIndex := 1
+
+	sqlQuery := `
+		SELECT id, title, description, type, datetime_start, provider, external, total_seats, created_at, updated_at
+		FROM events_archive
+		WHERE 1=1`
+
+	// Add search filter
+	if query != "" {
+		sqlQuery += fmt.Sprintf(" AND (title ILIKE $%d OR description ILIKE $%d)", argIndex, argIndex)
+		args = append(args, "%"+query+"%")
+		argIndex++
+	}
+
+	// Add date filter
+	if date != "" {
+		sqlQuery += fmt.Sprintf(" AND DATE(datetime_start) = $%d", argIndex)
+		args = append(args, date)
+		argIndex++
+	}
+
+	sqlQuery += " ORDER BY id ASC"
+
+	// Add pagination
+	if page > 0 && pageSize > 0 {
+		offset := (page - 1) * pageSize
+		sqlQuery += fmt.Sprintf(" LIMIT $%d OFFSET $%d", argIndex, argIndex+1)
+		args = append(args, pageSize, offset)
+	}
+
+	rows, err := r.db.QueryContext(ctx, sqlQuery, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var event models.Event
+		err := rows.Scan(
+			&event.ID,
+			&event.Title,
+			&event.Description,
+			&event.Type,
+			&event.DatetimeStart,
+			&event.Provider,
+			&event.External,
+			&event.TotalSeats,
+			&event.CreatedAt,
+			&event.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		events = append(events, event)
+	}
+
+	return events, rows.Err()
+}
+
+func (r *EventRepository) Update(ctx context.Context, event *models.Event) error {
+	query := `
+		UPDATE events_archive 
+		SET title = $1, description = $2, type = $3, datetime_start = $4, 
+		    provider = $5, external = $6, total_seats = $7, updated_at = $8
+		WHERE id = $9`
+
+	event.UpdatedAt = time.Now()
+
+	_, err := r.db.ExecContext(ctx, query,
+		event.Title,
+		event.Description,
+		event.Type,
+		event.DatetimeStart,
+		event.Provider,
+		event.External,
+		event.TotalSeats,
+		event.UpdatedAt,
+		event.ID,
+	)
+
+	return err
+}

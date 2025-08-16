@@ -7,13 +7,22 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"bulbul/internal/models"
+	"bulbul/internal/service"
 )
+
+type Handlers struct {
+	services *service.Services
+}
+
+func NewHandlers(services *service.Services) *Handlers {
+	return &Handlers{services: services}
+}
 
 // Events handlers
 
 // CreateEvent - POST /api/events
 // Создать событие
-func CreateEvent(c *gin.Context) {
+func (h *Handlers) CreateEvent(c *gin.Context) {
 	var req models.CreateEventRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -23,9 +32,11 @@ func CreateEvent(c *gin.Context) {
 	// Логируем полученные данные для отладки
 	log.Printf("Received event request: title=%s, external=%v", req.Title, req.External.Bool())
 
-	// Захардкоженный ответ согласно спецификации
-	response := models.CreateEventResponse{
-		ID: 1, // Захардкоженный ID
+	response, err := h.services.Events.Create(c.Request.Context(), &req)
+	if err != nil {
+		log.Printf("Failed to create event: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create event"})
+		return
 	}
 
 	c.JSON(http.StatusCreated, response)
@@ -33,17 +44,30 @@ func CreateEvent(c *gin.Context) {
 
 // ListEvents - GET /api/events
 // Получить список событий
-func ListEvents(c *gin.Context) {
-	// Захардкоженный ответ согласно спецификации
-	response := models.ListEventsResponse{
-		{
-			ID:    1,
-			Title: "Концерт классической музыки",
-		},
-		{
-			ID:    2,
-			Title: "Театральная постановка",
-		},
+func (h *Handlers) ListEvents(c *gin.Context) {
+	query := c.Query("query")
+	date := c.Query("date")
+	
+	// Get pagination parameters
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "10"))
+	
+	// Validate pagination parameters
+	if page < 1 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "page must be >= 1"})
+		return
+	}
+	
+	if pageSize < 1 || pageSize > 20 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "pageSize must be between 1 and 20"})
+		return
+	}
+
+	response, err := h.services.Events.List(c.Request.Context(), query, date, page, pageSize)
+	if err != nil {
+		log.Printf("Failed to list events: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to list events"})
+		return
 	}
 
 	c.JSON(http.StatusOK, response)
@@ -53,16 +77,18 @@ func ListEvents(c *gin.Context) {
 
 // CreateBooking - POST /api/bookings
 // Создать бронирование
-func CreateBooking(c *gin.Context) {
+func (h *Handlers) CreateBooking(c *gin.Context) {
 	var req models.CreateBookingRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Захардкоженный ответ согласно спецификации
-	response := models.CreateBookingResponse{
-		ID: 1, // Захардкоженный ID
+	response, err := h.services.Bookings.Create(c.Request.Context(), &req)
+	if err != nil {
+		log.Printf("Failed to create booking: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create booking"})
+		return
 	}
 
 	c.JSON(http.StatusCreated, response)
@@ -70,17 +96,15 @@ func CreateBooking(c *gin.Context) {
 
 // ListBookings - GET /api/bookings
 // Получить список бронирований
-func ListBookings(c *gin.Context) {
-	// Захардкоженный ответ согласно спецификации
-	response := models.ListBookingsResponse{
-		{
-			ID:      1,
-			EventID: 1,
-		},
-		{
-			ID:      2,
-			EventID: 2,
-		},
+func (h *Handlers) ListBookings(c *gin.Context) {
+	// For now, use a dummy user ID. In real implementation, get from auth context
+	userID := int64(1)
+
+	response, err := h.services.Bookings.List(c.Request.Context(), userID)
+	if err != nil {
+		log.Printf("Failed to list bookings: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to list bookings"})
+		return
 	}
 
 	c.JSON(http.StatusOK, response)
@@ -88,23 +112,43 @@ func ListBookings(c *gin.Context) {
 
 // InitiatePayment - PATCH /api/bookings/initiatePayment
 // Инициировать платеж для бронирования
-func InitiatePayment(c *gin.Context) {
+func (h *Handlers) InitiatePayment(c *gin.Context) {
 	var req models.InitiatePaymentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Согласно спецификации - возвращаем 200 без тела ответа
-	c.Status(http.StatusOK)
+	paymentURL, err := h.services.Bookings.InitiatePayment(c.Request.Context(), &req)
+	if err != nil {
+		log.Printf("Failed to initiate payment: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to initiate payment"})
+		return
+	}
+
+	// If payment URL is provided, redirect to payment gateway
+	if paymentURL != "" {
+		c.Header("Location", paymentURL)
+		c.Status(http.StatusFound) // 302
+	} else {
+		// For external events, no payment needed
+		c.Status(http.StatusOK)
+	}
 }
 
 // CancelBooking - PATCH /api/bookings/cancel
 // Отменить бронирование
-func CancelBooking(c *gin.Context) {
+func (h *Handlers) CancelBooking(c *gin.Context) {
 	var req models.CancelBookingRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	err := h.services.Bookings.Cancel(c.Request.Context(), &req)
+	if err != nil {
+		log.Printf("Failed to cancel booking: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to cancel booking"})
 		return
 	}
 
@@ -116,7 +160,7 @@ func CancelBooking(c *gin.Context) {
 
 // ListSeats - GET /api/seats
 // Получить список мест
-func ListSeats(c *gin.Context) {
+func (h *Handlers) ListSeats(c *gin.Context) {
 	// Получаем параметры согласно спецификации
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "10"))
@@ -138,26 +182,23 @@ func ListSeats(c *gin.Context) {
 		return
 	}
 
-	// Захардкоженный ответ согласно спецификации
-	response := models.ListSeatsResponse{
-		{
-			ID:       1,
-			Row:      1,
-			Number:   1,
-			Reserved: false,
-		},
-		{
-			ID:       2,
-			Row:      1,
-			Number:   2,
-			Reserved: true,
-		},
-		{
-			ID:       3,
-			Row:      2,
-			Number:   1,
-			Reserved: false,
-		},
+	// Опциональные параметры
+	var row *int
+	var status *string
+	if rowParam := c.Query("row"); rowParam != "" {
+		if r, err := strconv.Atoi(rowParam); err == nil {
+			row = &r
+		}
+	}
+	if statusParam := c.Query("status"); statusParam != "" {
+		status = &statusParam
+	}
+
+	response, err := h.services.Seats.List(c.Request.Context(), eventID, page, pageSize, row, status)
+	if err != nil {
+		log.Printf("Failed to list seats: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to list seats"})
+		return
 	}
 
 	c.JSON(http.StatusOK, response)
@@ -165,28 +206,40 @@ func ListSeats(c *gin.Context) {
 
 // SelectSeat - PATCH /api/seats/select
 // Выбрать место для брони
-func SelectSeat(c *gin.Context) {
+func (h *Handlers) SelectSeat(c *gin.Context) {
 	var req models.SelectSeatRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Захардкоженная логика - всегда успешно
+	err := h.services.Seats.Select(c.Request.Context(), &req)
+	if err != nil {
+		log.Printf("Failed to select seat: %v", err)
+		c.JSON(419, gin.H{"error": "Failed to select seat"})
+		return
+	}
+
 	// Согласно спецификации - возвращаем 200 без тела ответа
 	c.Status(http.StatusOK)
 }
 
 // ReleaseSeat - PATCH /api/seats/release
 // Убрать место из брони
-func ReleaseSeat(c *gin.Context) {
+func (h *Handlers) ReleaseSeat(c *gin.Context) {
 	var req models.ReleaseSeatRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Захардкоженная логика - всегда успешно
+	err := h.services.Seats.Release(c.Request.Context(), &req)
+	if err != nil {
+		log.Printf("Failed to release seat: %v", err)
+		c.JSON(419, gin.H{"error": "Failed to release seat"})
+		return
+	}
+
 	// Согласно спецификации - возвращаем 200 без тела ответа
 	c.Status(http.StatusOK)
 }
@@ -195,12 +248,15 @@ func ReleaseSeat(c *gin.Context) {
 
 // NotifyPaymentCompleted - GET /api/payments/success
 // Уведомить сервис, что платеж успешно проведен
-func NotifyPaymentCompleted(c *gin.Context) {
+func (h *Handlers) NotifyPaymentCompleted(c *gin.Context) {
 	orderID := c.Query("orderId")
 	if orderID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "orderId is required"})
 		return
 	}
+
+	// For now, just log the success
+	log.Printf("Payment completed for order: %s", orderID)
 
 	// Согласно спецификации - возвращаем 200 без тела ответа
 	c.Status(http.StatusOK)
@@ -208,10 +264,33 @@ func NotifyPaymentCompleted(c *gin.Context) {
 
 // NotifyPaymentFailed - GET /api/payments/fail
 // Уведомить сервис, что платеж неуспешно проведен
-func NotifyPaymentFailed(c *gin.Context) {
+func (h *Handlers) NotifyPaymentFailed(c *gin.Context) {
 	orderID := c.Query("orderId")
 	if orderID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "orderId is required"})
+		return
+	}
+
+	// For now, just log the failure
+	log.Printf("Payment failed for order: %s", orderID)
+
+	// Согласно спецификации - возвращаем 200 без тела ответа
+	c.Status(http.StatusOK)
+}
+
+// OnPaymentUpdates - POST /api/payments/notifications
+// Принимать уведомления от платежного шлюза
+func (h *Handlers) OnPaymentUpdates(c *gin.Context) {
+	var notification models.PaymentNotificationPayload
+	if err := c.ShouldBindJSON(&notification); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	err := h.services.Bookings.HandlePaymentNotification(c.Request.Context(), &notification)
+	if err != nil {
+		log.Printf("Failed to handle payment notification: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to handle notification"})
 		return
 	}
 
