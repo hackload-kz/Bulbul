@@ -88,3 +88,10 @@ resource "openstack_networking_secgroup_rule_v2" "https_rule" {
   remote_ip_prefix  = "0.0.0.0/0"
   security_group_id = openstack_networking_secgroup_v2.default_group.id
 }
+
+resource "openstack_networking_secgroup_rule_v2" "internal_rule" {
+  direction         = "ingress"
+  ethertype         = "IPv4"
+  remote_ip_prefix  = "192.168.0.0/24"
+  security_group_id = openstack_networking_secgroup_v2.default_group.id
+}
