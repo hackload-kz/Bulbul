@@ -1,0 +1,95 @@
+---
+- name: Create nats user
+  user:
+    name: nats
+    system: yes
+    shell: /bin/false
+    home: /var/lib/nats
+    create_home: yes
+
+- name: Create NATS directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: nats
+    group: nats
+    mode: '0755'
+  loop:
+    - /etc/nats
+    - /var/lib/nats
+    - /var/lib/nats/jetstream
+    - /var/log/nats
+    - /opt/nats
+
+- name: Download NATS server binary
+  get_url:
+    url: "https://github.com/nats-io/nats-server/releases/download/v{{ nats_version }}/nats-server-v{{ nats_version }}-linux-amd64.tar.gz"
+    dest: "/tmp/nats-server-v{{ nats_version }}-linux-amd64.tar.gz"
+    mode: '0644'
+
+- name: Extract NATS server
+  unarchive:
+    src: "/tmp/nats-server-v{{ nats_version }}-linux-amd64.tar.gz"
+    dest: /tmp
+    remote_src: yes
+
+- name: Install NATS server binary
+  copy:
+    src: "/tmp/nats-server-v{{ nats_version }}-linux-amd64/nats-server"
+    dest: /usr/local/bin/nats-server
+    owner: root
+    group: root
+    mode: '0755'
+    remote_src: yes
+
+- name: Configure NATS server
+  template:
+    src: nats-server.conf.j2
+    dest: /etc/nats/nats-server.conf
+    owner: nats
+    group: nats
+    mode: '0640'
+    backup: yes
+  notify: restart nats
+
+- name: Create NATS systemd service
+  copy:
+    content: |
+      [Unit]
+      Description=NATS Server
+      After=network.target
+      Documentation=https://nats.io/
+
+      [Service]
+      Type=simple
+      ExecStart=/usr/local/bin/nats-server -c /etc/nats/nats-server.conf
+      ExecReload=/bin/kill -s HUP $MAINPID
+      ExecStop=/bin/kill -s SIGINT $MAINPID
+      Restart=always
+      RestartSec=5s
+      User=nats
+      Group=nats
+      LimitNOFILE=65536
+
+      [Install]
+      WantedBy=multi-user.target
+    dest: /etc/systemd/system/nats.service
+    mode: '0644'
+  notify:
+    - reload systemd
+    - restart nats
+
+- name: Start and enable NATS
+  systemd:
+    name: nats
+    state: started
+    enabled: yes
+    daemon_reload: yes
+
+- name: Clean up downloaded files
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "/tmp/nats-server-v{{ nats_version }}-linux-amd64.tar.gz"
+    - "/tmp/nats-server-v{{ nats_version }}-linux-amd64"

@@ -1,0 +1,101 @@
+---
+- name: Update package cache
+  apt:
+    update_cache: yes
+    cache_valid_time: 86400
+
+- name: Install nginx and certbot
+  apt:
+    name:
+      - nginx
+      - certbot
+      - python3-certbot-nginx
+    state: present
+
+- name: Create nginx directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  loop:
+    - /etc/nginx/sites-available
+    - /etc/nginx/sites-enabled
+    - /var/www/html
+
+- name: Configure main nginx.conf
+  template:
+    src: nginx.conf.j2
+    dest: /etc/nginx/nginx.conf
+    owner: root
+    group: root
+    mode: '0644'
+    backup: yes
+  notify: restart nginx
+
+- name: Remove default nginx site
+  file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: restart nginx
+
+- name: Configure HTTP-only site (initial setup)
+  template:
+    src: bulbul-site-http.conf.j2
+    dest: /etc/nginx/sites-available/bulbul
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart nginx
+
+- name: Enable bulbul site
+  file:
+    src: /etc/nginx/sites-available/bulbul
+    dest: /etc/nginx/sites-enabled/bulbul
+    state: link
+  notify: restart nginx
+
+- name: Start and enable nginx
+  systemd:
+    name: nginx
+    state: started
+    enabled: yes
+
+- name: Test nginx configuration
+  command: nginx -t
+  register: nginx_test
+  changed_when: false
+
+- name: Flush handlers to ensure nginx is running
+  meta: flush_handlers
+
+- name: Create SSL setup script
+  template:
+    src: setup-ssl.sh.j2
+    dest: /usr/local/bin/setup-ssl.sh
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Setup SSL certificates
+  command: /usr/local/bin/setup-ssl.sh
+  args:
+    creates: /etc/letsencrypt/live/{{ domain_name }}/fullchain.pem
+  when: setup_ssl | default(true)
+
+- name: Configure HTTPS site (after SSL certificates)
+  template:
+    src: bulbul-site-https.conf.j2
+    dest: /etc/nginx/sites-available/bulbul
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart nginx
+  when: setup_ssl | default(true)
+
+- name: Test final nginx configuration
+  command: nginx -t
+  register: nginx_test_final
+  changed_when: false
+  when: setup_ssl | default(true)
