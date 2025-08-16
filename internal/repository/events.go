@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"bulbul/internal/database"
@@ -74,10 +75,19 @@ func (r *EventRepository) List(ctx context.Context, query string, date string, p
 		FROM events_archive
 		WHERE 1=1`
 
-	// Add search filter
+	// Add search filter with full-text search
 	if query != "" {
-		sqlQuery += fmt.Sprintf(" AND (title ILIKE $%d OR description ILIKE $%d)", argIndex, argIndex)
-		args = append(args, "%"+query+"%")
+		// Use PostgreSQL full-text search with Russian language support
+		sqlQuery += fmt.Sprintf(" AND search_vector @@ to_tsquery('russian', $%d)", argIndex)
+		
+		// Prepare search query - handle multiple words and special characters
+		searchQuery := query
+		// Add :* suffix for prefix matching if the query doesn't contain special operators
+		if !containsSearchOperators(searchQuery) {
+			searchQuery = searchQuery + ":*"
+		}
+		
+		args = append(args, searchQuery)
 		argIndex++
 	}
 
@@ -88,7 +98,12 @@ func (r *EventRepository) List(ctx context.Context, query string, date string, p
 		argIndex++
 	}
 
-	sqlQuery += " ORDER BY id ASC"
+	// Add ordering - prioritize search relevance if searching, otherwise by ID
+	if query != "" {
+		sqlQuery += " ORDER BY ts_rank(search_vector, to_tsquery('russian', $" + fmt.Sprintf("%d", len(args)) + ")) DESC, id ASC"
+	} else {
+		sqlQuery += " ORDER BY id ASC"
+	}
 
 	// Add pagination
 	if page > 0 && pageSize > 0 {
@@ -148,4 +163,15 @@ func (r *EventRepository) Update(ctx context.Context, event *models.Event) error
 	)
 
 	return err
+}
+
+// containsSearchOperators checks if the search query contains PostgreSQL search operators
+func containsSearchOperators(query string) bool {
+	operators := []string{"&", "|", "!", "(", ")", ":", "*"}
+	for _, op := range operators {
+		if strings.Contains(query, op) {
+			return true
+		}
+	}
+	return false
 }
