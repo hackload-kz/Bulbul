@@ -1,5 +1,7 @@
 #!/bin/bash
 
+mkdir -p ./data
+
 events_source_file="https://github.com/hackload-kz/data/releases/download/2025-08-15/events.sql"
 users_source_file="https://github.com/hackload-kz/data/releases/download/2025-08-15/users.sql"
 
