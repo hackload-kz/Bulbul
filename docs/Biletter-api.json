@@ -54,6 +54,18 @@
           "title"
         ]
       },
+      "ListEventsResponseItemSeat": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
       "ListEventsResponse": {
         "type": "array",
         "items": {
@@ -70,6 +82,12 @@
           "event_id": {
             "type": "integer",
             "format": "int64"
+          },
+          "seats": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ListEventsResponseItemSeat"
+            }
           }
         },
         "required": [
@@ -122,15 +140,18 @@
             "type": "integer",
             "format": "int64"
           },
-          "reserved": {
-            "type": "boolean"
+          "status": {
+            "type": "string",
+            "enum": [
+              "FREE, RESERVED, SOLD"
+            ]
           }
         },
         "required": [
           "id",
           "row",
           "number",
-          "reserved"
+          "status"
         ]
       },
       "ListSeatsResponse": {
@@ -191,41 +212,35 @@
         "required": [
           "booking_id"
         ]
+      },
+      "PaymentNotificationPayload": {
+        "type": "object",
+        "properties": {
+          "paymentId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "teamSlug": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object"
+            }
+          }
+        }
       }
     }
   },
   "paths": {
     "/api/events": {
-      "post": {
-        "tags": [
-          "Events"
-        ],
-        "operationId": "CreateEvent",
-        "summary": "Создать событие",
-        "description": "Возвращает идентификатор события при успехе",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateEventRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Событие успешно создано",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CreateEventResponse"
-                }
-              }
-            }
-          }
-        }
-      },
       "get": {
         "tags": [
           "Events"
@@ -233,6 +248,25 @@
         "operationId": "ListEvents",
         "summary": "Получить список событий",
         "description": "Возвращает список событие при успехе",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "query",
+            "description": "Параметр для полноконтекстного поиска",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date",
+            "description": "Параметр для фильтрации по дате события",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Список событий успешно получен",
@@ -361,7 +395,7 @@
             "schema": {
               "type": "integer",
               "format": "int32",
-              "minimum": "1"
+              "minimum": 1
             }
           },
           {
@@ -370,8 +404,8 @@
             "schema": {
               "type": "integer",
               "format": "int32",
-              "minimum": "1",
-              "maximum": "20"
+              "minimum": 1,
+              "maximum": 20
             }
           },
           {
@@ -382,6 +416,25 @@
               "format": "int64"
             },
             "required": true
+          },
+          {
+            "in": "query",
+            "name": "row",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "FREE", "RESERVED", "SOLD"
+              ]
+            }
           }
         ],
         "operationId": "ListSeats",
@@ -502,6 +555,31 @@
             "required": true
           }
         ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/payments/notifications": {
+      "post": {
+        "tags": [
+          "Payments"
+        ],
+        "operationId": "OnPaymentUpdates",
+        "summary": "Принимать уведомления от платежного шлюза",
+        "description": "Принимать уведомления от платежного шлюза",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentNotificationPayload"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "OK"

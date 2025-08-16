@@ -25,7 +25,7 @@ unset OS_TENANT_NAME
 # In addition to the owning entity (tenant), OpenStack stores the entity
 # performing the action as the **user**.
 export OS_USERNAME="17769_omega-mercury"
-export OS_PASSWORD=$(cat .os_password)
+export OS_PASSWORD=$(cat $(dirname "$0")/.os_password)
 # If your configuration has multiple regions, we set that information here.
 # OS_REGION_NAME is optional and only valid in certain environments.
 export OS_REGION_NAME="kz-ala-1"
