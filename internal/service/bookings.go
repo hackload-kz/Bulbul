@@ -15,20 +15,22 @@ import (
 )
 
 type BookingService struct {
-	bookingRepo   *repository.BookingRepository
-	eventRepo     *repository.EventRepository
-	seatRepo      *repository.SeatRepository
-	paymentClient *external.PaymentClient
-	natsClient    *messaging.NATSClient
+	bookingRepo     *repository.BookingRepository
+	eventRepo       *repository.EventRepository
+	seatRepo        *repository.SeatRepository
+	paymentClient   *external.PaymentClient
+	ticketingClient *external.TicketingClient
+	natsClient      *messaging.NATSClient
 }
 
-func NewBookingService(bookingRepo *repository.BookingRepository, eventRepo *repository.EventRepository, seatRepo *repository.SeatRepository, paymentClient *external.PaymentClient, natsClient *messaging.NATSClient) *BookingService {
+func NewBookingService(bookingRepo *repository.BookingRepository, eventRepo *repository.EventRepository, seatRepo *repository.SeatRepository, paymentClient *external.PaymentClient, ticketingClient *external.TicketingClient, natsClient *messaging.NATSClient) *BookingService {
 	return &BookingService{
-		bookingRepo:   bookingRepo,
-		eventRepo:     eventRepo,
-		seatRepo:      seatRepo,
-		paymentClient: paymentClient,
-		natsClient:    natsClient,
+		bookingRepo:     bookingRepo,
+		eventRepo:       eventRepo,
+		seatRepo:        seatRepo,
+		paymentClient:   paymentClient,
+		ticketingClient: ticketingClient,
+		natsClient:      natsClient,
 	}
 }
 
@@ -53,6 +55,19 @@ func (s *BookingService) Create(ctx context.Context, req *models.CreateBookingRe
 	// Set user_id from request context if present
 	if id, ok := middleware.UserIDFromContext(ctx); ok {
 		booking.UserID = &id
+	}
+
+	// For external events (event ID = 1), start order with ticketing service
+	if req.EventID == 1 {
+		startOrderResp, err := s.ticketingClient.StartOrder()
+		if err != nil {
+			return nil, fmt.Errorf("failed to start external order: %w", err)
+		}
+
+		// Set the external order ID
+		booking.OrderID = &startOrderResp.OrderID
+		booking.Status = "CONFIRMED"        // External bookings are confirmed immediately
+		booking.PaymentStatus = "COMPLETED" // No payment needed for external events
 	}
 
 	err = s.bookingRepo.Create(ctx, booking)

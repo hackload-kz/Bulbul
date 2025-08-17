@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"time"
 
 	"bulbul/internal/external"
@@ -15,14 +14,16 @@ import (
 type SeatService struct {
 	seatRepo        *repository.SeatRepository
 	eventRepo       *repository.EventRepository
+	bookingRepo     *repository.BookingRepository
 	ticketingClient *external.TicketingClient
 	natsClient      *messaging.NATSClient
 }
 
-func NewSeatService(seatRepo *repository.SeatRepository, eventRepo *repository.EventRepository, ticketingClient *external.TicketingClient, natsClient *messaging.NATSClient) *SeatService {
+func NewSeatService(seatRepo *repository.SeatRepository, eventRepo *repository.EventRepository, bookingRepo *repository.BookingRepository, ticketingClient *external.TicketingClient, natsClient *messaging.NATSClient) *SeatService {
 	return &SeatService{
 		seatRepo:        seatRepo,
 		eventRepo:       eventRepo,
+		bookingRepo:     bookingRepo,
 		ticketingClient: ticketingClient,
 		natsClient:      natsClient,
 	}
@@ -94,7 +95,21 @@ func (s *SeatService) listExternalSeats(page, pageSize int) ([]models.ListSeatsR
 }
 
 func (s *SeatService) Select(ctx context.Context, req *models.SelectSeatRequest) error {
-	// Get seat to determine event
+	// First, get the booking to determine the event
+	booking, err := s.getBookingByID(ctx, req.BookingID)
+	if err != nil {
+		return fmt.Errorf("failed to get booking: %w", err)
+	}
+	if booking == nil {
+		return fmt.Errorf("booking not found")
+	}
+
+	// If event ID = 1 (external), use ticketing service directly
+	if booking.EventID == 1 {
+		return s.selectExternalSeat(ctx, req)
+	}
+
+	// For regular events, get seat to verify it exists
 	seat, err := s.seatRepo.GetByID(ctx, req.SeatID)
 	if err != nil {
 		return fmt.Errorf("failed to get seat: %w", err)
@@ -103,12 +118,12 @@ func (s *SeatService) Select(ctx context.Context, req *models.SelectSeatRequest)
 		return fmt.Errorf("seat not found")
 	}
 
-	// If event ID = 1 (external), use ticketing service
-	if seat.EventID == 1 {
-		return s.selectExternalSeat(ctx, req)
+	// Verify the seat belongs to the same event as the booking
+	if seat.EventID != booking.EventID {
+		return fmt.Errorf("seat does not belong to the same event as the booking")
 	}
 
-	// For regular events, use database
+	// Reserve the seat in database
 	err = s.seatRepo.ReserveSeat(ctx, req.SeatID, req.BookingID)
 	if err != nil {
 		return fmt.Errorf("failed to reserve seat: %w", err)
@@ -134,9 +149,23 @@ func (s *SeatService) selectExternalSeat(ctx context.Context, req *models.Select
 	// For external seats, we need to map seat ID to place ID
 	// This is simplified - in real implementation we'd need proper mapping
 	placeID := req.SeatID // SeatID is already a string
-	orderID := strconv.FormatInt(req.BookingID, 10)
 
-	err := s.ticketingClient.SelectPlace(placeID, orderID)
+	// Get the booking to get the external order ID
+	booking, err := s.getBookingByID(ctx, req.BookingID)
+	if err != nil {
+		return fmt.Errorf("failed to get booking: %w", err)
+	}
+	if booking == nil {
+		return fmt.Errorf("booking not found")
+	}
+
+	if booking.OrderID == nil {
+		return fmt.Errorf("external booking must have order ID")
+	}
+
+	orderID := *booking.OrderID
+
+	err = s.ticketingClient.SelectPlace(placeID, orderID)
 	if err != nil {
 		return fmt.Errorf("failed to select external place: %w", err)
 	}
@@ -194,10 +223,23 @@ func (s *SeatService) Release(ctx context.Context, req *models.ReleaseSeatReques
 }
 
 func (s *SeatService) releaseExternalSeat(ctx context.Context, req *models.ReleaseSeatRequest) error {
+	// For external seats, we need to get the booking to get the order ID
+	booking, err := s.seatRepo.GetBookingBySeatID(ctx, req.SeatID)
+	if err != nil {
+		return fmt.Errorf("failed to get booking for seat: %w", err)
+	}
+	if booking == nil {
+		return fmt.Errorf("no booking found for seat")
+	}
+
+	if booking.OrderID == nil {
+		return fmt.Errorf("external booking must have order ID")
+	}
+
 	// For external seats, we need to map seat ID to place ID
 	placeID := req.SeatID // SeatID is already a string
 
-	err := s.ticketingClient.ReleasePlace(placeID)
+	err = s.ticketingClient.ReleasePlace(placeID)
 	if err != nil {
 		return fmt.Errorf("failed to release external place: %w", err)
 	}
@@ -215,4 +257,8 @@ func (s *SeatService) releaseExternalSeat(ctx context.Context, req *models.Relea
 	}
 
 	return nil
+}
+
+func (s *SeatService) getBookingByID(ctx context.Context, bookingID int64) (*models.Booking, error) {
+	return s.bookingRepo.GetByID(ctx, bookingID)
 }

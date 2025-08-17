@@ -18,12 +18,13 @@ func NewBookingRepository(db *database.DB) *BookingRepository {
 
 func (r *BookingRepository) Create(ctx context.Context, booking *models.Booking) error {
 	query := `
-		INSERT INTO bookings (event_id, user_id, status, payment_status, total_amount)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO bookings (event_id, order_id, user_id, status, payment_status, total_amount)
+		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING id, created_at, updated_at`
 
 	err := r.db.QueryRowContext(ctx, query,
 		booking.EventID,
+		booking.OrderID,
 		booking.UserID,
 		booking.Status,
 		booking.PaymentStatus,

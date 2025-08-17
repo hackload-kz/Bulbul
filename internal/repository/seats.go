@@ -201,3 +201,32 @@ func (r *SeatRepository) ReleaseSeat(ctx context.Context, seatID string) error {
 
 	return tx.Commit()
 }
+
+func (r *SeatRepository) GetBookingBySeatID(ctx context.Context, seatID string) (*models.Booking, error) {
+	booking := &models.Booking{}
+	query := `
+		SELECT b.id, b.event_id, b.user_id, b.status, b.payment_status, b.total_amount,
+		       b.payment_id, b.order_id, b.created_at, b.updated_at
+		FROM bookings b
+		JOIN booking_seats bs ON b.id = bs.booking_id
+		WHERE bs.seat_id = $1`
+
+	err := r.db.QueryRowContext(ctx, query, seatID).Scan(
+		&booking.ID,
+		&booking.EventID,
+		&booking.UserID,
+		&booking.Status,
+		&booking.PaymentStatus,
+		&booking.TotalAmount,
+		&booking.PaymentID,
+		&booking.OrderID,
+		&booking.CreatedAt,
+		&booking.UpdatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+
+	return booking, err
+}
