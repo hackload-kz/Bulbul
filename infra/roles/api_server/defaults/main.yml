@@ -41,7 +41,7 @@ nats_cluster_id: "bulbul-cluster"
 nats_client_id: "bulbul-api"
 
 # External services
-ticketing_service_url: "https://hub.hackload.kz/event-provider/common"
+ticketing_service_url: "https://hub.hackload.kz/event/Bulbul/event-provider"
 payment_gateway_url: "https://hub.hackload.kz/payment-provider/common"
 payment_team_slug: "bulbul"
 payment_password: "hackload2025"
