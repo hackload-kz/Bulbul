@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 
+	"bulbul/internal/cache"
 	"bulbul/internal/config"
 	"bulbul/internal/database"
 	"bulbul/internal/external"
@@ -19,12 +20,13 @@ import (
 
 // Server представляет HTTP сервер API
 type Server struct {
-	router   *gin.Engine
-	config   *config.Config
-	db       *database.DB
-	nats     *messaging.NATSClient
-	services *service.Services
-	repos    *repository.Repositories
+	router      *gin.Engine
+	config      *config.Config
+	db          *database.DB
+	nats        *messaging.NATSClient
+	services    *service.Services
+	repos       *repository.Repositories
+	valkeyClient *cache.ValkeyClient
 }
 
 // NewServer создает новый экземпляр сервера
@@ -59,6 +61,14 @@ func NewServer(cfg *config.Config) *Server {
 	// Создаем сервисы
 	services := service.NewServices(repos, natsClient, ticketingClient, paymentClient)
 
+	// Создаем Valkey клиент (может быть nil если не удалось подключиться)
+	var valkeyClient *cache.ValkeyClient
+	valkeyClient, err = cache.NewValkeyClient()
+	if err != nil {
+		log.Printf("Warning: Failed to connect to Valkey, falling back to database auth: %v", err)
+		valkeyClient = nil
+	}
+
 	// Создаем роутер
 	router := gin.Default()
 
@@ -68,12 +78,13 @@ func NewServer(cfg *config.Config) *Server {
 
 	// Создаем сервер
 	server := &Server{
-		router:   router,
-		config:   cfg,
-		db:       db,
-		nats:     natsClient,
-		services: services,
-		repos:    repos,
+		router:       router,
+		config:       cfg,
+		db:           db,
+		nats:         natsClient,
+		services:     services,
+		repos:        repos,
+		valkeyClient: valkeyClient,
 	}
 
 	// Настраиваем роуты
@@ -90,7 +101,7 @@ func (s *Server) setupRoutes() {
 	// API routes
 	api := s.router.Group("/api")
 	// Обязательная Basic Auth для всех API роутов
-	api.Use(middleware.BasicAuth(s.repos.Users))
+	api.Use(middleware.BasicAuth(s.repos.Users, s.valkeyClient))
 	{
 		// Events endpoints
 		events := api.Group("/events")

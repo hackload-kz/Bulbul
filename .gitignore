@@ -238,3 +238,4 @@ terraform.tfstate.backup
 /.idea/
 data
 .claude
+infra/files/api-server

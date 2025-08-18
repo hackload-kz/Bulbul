@@ -1,54 +1,8 @@
 ---
-- name: Install required packages
-  apt:
-    name:
-      - git
-      - build-essential
-      - curl
-      - wget
-    state: present
-    update_cache: yes
-
-- name: Check if Go is installed
-  command: go version
-  register: go_check
-  ignore_errors: yes
-  changed_when: false
-
-- name: Download and install Go
-  block:
-    - name: Download Go
-      get_url:
-        url: "https://golang.org/dl/go{{ go_version }}.linux-amd64.tar.gz"
-        dest: "/tmp/go{{ go_version }}.linux-amd64.tar.gz"
-
-    - name: Remove existing Go installation
-      file:
-        path: "{{ go_install_dir }}/go"
-        state: absent
-
-    - name: Extract Go
-      unarchive:
-        src: "/tmp/go{{ go_version }}.linux-amd64.tar.gz"
-        dest: "{{ go_install_dir }}"
-        remote_src: yes
-
-    - name: Add Go to PATH
-      lineinfile:
-        path: /etc/profile
-        line: 'export PATH=$PATH:{{ go_install_dir }}/go/bin'
-        create: yes
-
-    - name: Set Go environment variables
-      lineinfile:
-        path: /etc/environment
-        line: "{{ item }}"
-        create: yes
-      loop:
-        - "GOROOT={{ go_install_dir }}/go"
-        - "GOPATH=/opt/go"
-        - "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:{{ go_install_dir }}/go/bin"
-  when: go_check.rc != 0
+- name: Create API server group
+  group:
+    name: "{{ api_server_group }}"
+    system: yes
 
 - name: Create API server user
   user:
@@ -70,33 +24,16 @@
     - "{{ api_server_home }}"
     - "{{ api_server_config_dir }}"
     - "/var/log/bulbul"
-    - "/opt/go"
 
-- name: Clone API server repository
-  git:
-    repo: "{{ api_server_repo_url }}"
-    dest: "{{ api_server_build_dir }}"
-    version: "{{ api_server_repo_branch }}"
-    force: yes
-  environment:
-    PATH: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:{{ go_install_dir }}/go/bin"
-
-- name: Build API server binary
-  command: "{{ go_install_dir }}/go/bin/go build -o {{ api_server_binary_path }} ./cmd/api"
-  args:
-    chdir: "{{ api_server_build_dir }}"
-  environment:
-    GOROOT: "{{ go_install_dir }}/go"
-    GOPATH: "/opt/go"
-    PATH: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:{{ go_install_dir }}/go/bin"
-  notify: restart api-server
-
-- name: Set binary permissions
-  file:
-    path: "{{ api_server_binary_path }}"
+- name: Copy API server binary
+  copy:
+    src: "files/api-server"
+    dest: "{{ api_server_binary_path }}"
     owner: "{{ api_server_user }}"
     group: "{{ api_server_group }}"
     mode: '0755'
+    force: true
+  notify: restart api-server
 
 - name: Create environment file
   template:
@@ -141,22 +78,4 @@
     enabled: yes
     daemon_reload: yes
 
-- name: Wait for API server to be ready
-  uri:
-    url: "http://localhost:{{ api_server_port }}/health"
-    method: GET
-    status_code: 200
-  retries: 30
-  delay: 2
-  register: health_check
-  until: health_check.status == 200
 
-- name: Clean up build directory
-  file:
-    path: "{{ api_server_build_dir }}"
-    state: absent
-
-- name: Clean up Go download
-  file:
-    path: "/tmp/go{{ go_version }}.linux-amd64.tar.gz"
-    state: absent

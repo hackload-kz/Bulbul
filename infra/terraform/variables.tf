@@ -4,7 +4,7 @@ variable "vms_enabled" {
 
 variable "api_server_count" {
   type = number
-  default = 0
+  default = 1
 }
 
 variable "consumer_server_count" {

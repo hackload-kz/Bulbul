@@ -2,11 +2,9 @@
 domain_name: "bulbul.hub.hackload.kz"
 ssl_email: "admin@hackload.kz"
 setup_ssl: true
-ssl_staging: true  # Use Let's Encrypt staging for testing
+ssl_staging: false
 
-# Backend servers configuration
-backend_servers:
-  - { host: "127.0.0.1", port: "8080" }  # Placeholder
+# Backend servers will be auto-discovered from api_servers ansible group
 
 # Nginx performance settings
 worker_processes: "auto"

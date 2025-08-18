@@ -6,7 +6,6 @@ import (
 	"log"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/nats-io/stan.go"
 )
 
@@ -21,18 +20,19 @@ type Config struct {
 }
 
 func NewNATSClient(cfg Config) (*NATSClient, error) {
-	// Generate unique client ID to avoid conflicts
-	uniqueClientID := fmt.Sprintf("%s-%s", cfg.ClientID, uuid.New().String()[:8])
-	
-	conn, err := stan.Connect(cfg.ClusterID, uniqueClientID, stan.NatsURL(cfg.URL))
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to NATS Streaming: %w", err)
-	}
+	// // Generate unique client ID to avoid conflicts
+	// uniqueClientID := fmt.Sprintf("%s-%s", cfg.ClientID, uuid.New().String()[:8])
 
-	log.Printf("Connected to NATS Streaming: %s (cluster: %s, client: %s)", 
-		cfg.URL, cfg.ClusterID, uniqueClientID)
+	// conn, err := stan.Connect(cfg.ClusterID, uniqueClientID, stan.NatsURL(cfg.URL))
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to connect to NATS Streaming: %w", err)
+	// }
 
-	return &NATSClient{conn: conn}, nil
+	// log.Printf("Connected to NATS Streaming: %s (cluster: %s, client: %s)",
+	// 	cfg.URL, cfg.ClusterID, uniqueClientID)
+
+	// return &NATSClient{conn: conn}, nil
+	return &NATSClient{}, nil
 }
 
 func (nc *NATSClient) Publish(subject string, data interface{}) error {
@@ -61,7 +61,7 @@ func (nc *NATSClient) Subscribe(subject string, handler stan.MsgHandler) (stan.S
 }
 
 func (nc *NATSClient) SubscribeQueue(subject, queue string, handler stan.MsgHandler) (stan.Subscription, error) {
-	sub, err := nc.conn.QueueSubscribe(subject, queue, handler, 
+	sub, err := nc.conn.QueueSubscribe(subject, queue, handler,
 		stan.DurableName(subject+"-"+queue+"-durable"),
 		stan.AckWait(30*time.Second),
 		stan.MaxInflight(1))

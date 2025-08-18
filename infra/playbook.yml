@@ -26,30 +26,11 @@
     - valkey
   tags: valkey
 
-- name: Provision Backend Servers
-  hosts: backend_servers
+- name: Deploy API Server
+  hosts: api_servers
   become: yes
   gather_facts: yes
   
-  tasks:
-    - name: Update package cache
-      apt:
-        update_cache: yes
-        cache_valid_time: 86400
-    
-    - name: Install basic packages
-      apt:
-        name:
-          - htop
-          - curl
-          - wget
-        state: present
-    
-    - name: Display backend server info
-      debug:
-        msg: |
-          Backend server ready for application deployment
-          Private IP: {{ ansible_host }}
-          Gateway: Load balancer ({{ hostvars[groups['load_balancer'][0]]['ansible_host'] }})
-  
-  tags: backend
+  roles:
+    - api_server
+  tags: api_server

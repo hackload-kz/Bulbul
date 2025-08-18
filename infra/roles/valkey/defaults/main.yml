@@ -24,3 +24,14 @@ valkey_rdbchecksum: "no"
 valkey_appendonly: "yes"
 valkey_appendfsync: "no"
 
+# Data loading for users cache
+valkey_load_users: true
+valkey_data_dir: "/tmp/valkey_data"
+valkey_users_sql_url: "https://github.com/hackload-kz/data/releases/download/2025-08-15/users.sql"
+
+postgres_host: "{{ hostvars[groups['postgres'][0]]['ansible_host'] }}"
+postgres_port: "5432"
+postgres_user: "postgres"
+postgres_password: "postgres_admin_123"
+postgres_database: "bulbul"
+postgres_sslmode: "disable"

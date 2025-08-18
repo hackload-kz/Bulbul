@@ -106,7 +106,15 @@
 - name: Setup SSL certificates
   command: /usr/local/bin/setup-ssl.sh
   args:
-    creates: /etc/letsencrypt/live/{{ domain_name }}/fullchain.pem
+    creates: /etc/letsencrypt/live/{{ domain_name }}-current/fullchain.pem
+  register: ssl_setup_result
+  failed_when: false
+  when: setup_ssl | default(true)
+
+- name: Check if SSL certificates exist
+  stat:
+    path: /etc/letsencrypt/live/{{ domain_name }}-current/fullchain.pem
+  register: ssl_cert_check
   when: setup_ssl | default(true)
 
 - name: Configure HTTPS site (after SSL certificates)
@@ -117,10 +125,25 @@
     group: root
     mode: '0644'
   notify: restart nginx
-  when: setup_ssl | default(true)
+  when: 
+    - setup_ssl | default(true)
+    - ssl_cert_check.stat.exists | default(false)
 
 - name: Test final nginx configuration
   command: nginx -t
   register: nginx_test_final
   changed_when: false
-  when: setup_ssl | default(true)
+  when: 
+    - setup_ssl | default(true)
+    - ssl_cert_check.stat.exists | default(false)
+
+- name: Display SSL setup warning if certificates not found
+  debug:
+    msg: |
+      WARNING: SSL certificates were not created successfully.
+      The site is running in HTTP-only mode.
+      SSL setup result: {{ ssl_setup_result.stdout | default('N/A') }}
+      SSL setup error: {{ ssl_setup_result.stderr | default('N/A') }}
+  when: 
+    - setup_ssl | default(true)
+    - not (ssl_cert_check.stat.exists | default(false))

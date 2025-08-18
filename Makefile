@@ -1,4 +1,7 @@
-.PHONY: run test build clean
+.PHONY: run test build clean deploy deploy-api deploy-infra build-linux test-build help all
+
+# Default target for deployment
+all: build-linux deploy
 
 # Запуск сервера
 run:
@@ -17,13 +20,21 @@ validate-url:
 	@read -p "Enter API URL: " url; \
 	go run scripts/validate.go -url $$url
 
-# Сборка приложения
+# Сборка приложения (локально)
 build:
-	go build -o bulbul .
+	go build -o bulbul ./cmd/api
+
+# Build the API server binary locally for Linux deployment
+build-linux:
+	@echo "Building API server binary for Linux deployment..."
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build \
+          -ldflags="-w -s" \
+          -o "./infra/files/api-server" \
+          ./cmd/api
 
 # Очистка
 clean:
-	rm -f bulbul
+	rm -f bulbul infra/files/api-server
 
 # Установка зависимостей
 deps:

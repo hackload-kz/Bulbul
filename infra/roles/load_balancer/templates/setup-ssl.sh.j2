@@ -8,14 +8,46 @@ echo "Creating web root for Let's Encrypt challenges..."
 mkdir -p /var/www/html/.well-known/acme-challenge
 chown -R www-data:www-data /var/www/html
 
-echo "Obtaining SSL certificate for {{ domain_name }}..."
-{% if ssl_staging %}
-certbot --nginx -d {{ domain_name }} --non-interactive --agree-tos --email {{ ssl_email }} --staging --no-redirect
-{% else %}
-certbot --nginx -d {{ domain_name }} --non-interactive --agree-tos --email {{ ssl_email }} --no-redirect
-{% endif %}
+# Check if certificates already exist
+DOMAIN="{{ domain_name }}"
+CERT_DIR="/etc/letsencrypt/live"
+EXISTING_CERT=""
 
-echo "Certificate obtained successfully!"
+# Find existing certificate directory (with any suffix)
+if [ -d "$CERT_DIR/$DOMAIN" ]; then
+    EXISTING_CERT="$CERT_DIR/$DOMAIN"
+elif [ -d "$CERT_DIR/$DOMAIN-0001" ]; then
+    EXISTING_CERT="$CERT_DIR/$DOMAIN-0001"
+else
+    # Look for any directory that starts with the domain name
+    EXISTING_CERT=$(find "$CERT_DIR" -maxdepth 1 -type d -name "$DOMAIN*" | head -n 1)
+fi
+
+if [ -n "$EXISTING_CERT" ] && [ -f "$EXISTING_CERT/fullchain.pem" ]; then
+    echo "Found existing certificate at: $EXISTING_CERT"
+else
+    echo "Obtaining SSL certificate for {{ domain_name }}..."
+    {% if ssl_staging %}
+    certbot certonly --webroot -w /var/www/html -d {{ domain_name }} --non-interactive --agree-tos --email {{ ssl_email }} --staging
+    {% else %}
+    certbot certonly --webroot -w /var/www/html -d {{ domain_name }} --non-interactive --agree-tos --email {{ ssl_email }}
+    {% endif %}
+    
+    # Find the newly created certificate directory
+    EXISTING_CERT=$(find "$CERT_DIR" -maxdepth 1 -type d -name "$DOMAIN*" | head -n 1)
+fi
+
+# Create a consistent symlink to the certificate directory
+if [ -n "$EXISTING_CERT" ]; then
+    echo "Creating symlink for consistent certificate path..."
+    rm -f "$CERT_DIR/$DOMAIN-current"
+    ln -sf "$EXISTING_CERT" "$CERT_DIR/$DOMAIN-current"
+    echo "Certificate directory: $EXISTING_CERT"
+    echo "Symlink created: $CERT_DIR/$DOMAIN-current"
+else
+    echo "ERROR: Could not find or create certificate directory"
+    exit 1
+fi
 
 echo "Setting up automatic certificate renewal..."
 echo "0 12 * * * /usr/bin/certbot renew --quiet" | crontab -

@@ -1,8 +1,8 @@
 # Upstream backend servers
 upstream backend {
     least_conn;
-{% for server in backend_servers %}
-    server {{ server.host }}:{{ server.port }} max_fails=3 fail_timeout=30s;
+{% for host in groups['api_servers'] %}
+    server {{ hostvars[host]['ansible_host'] }}:8081 max_fails=3 fail_timeout=30s;
 {% endfor %}
 }
 

@@ -7,10 +7,11 @@ ${server.name} ansible_host=${server.ip} ansible_user=ubuntu
 %{ endfor ~}
 
 [postgres]
-${postgres_ip}
+postgres ansible_host=${postgres_ip} ansible_user=ubuntu
 
 [valkey]
-${valkey_ip}
+valkey ansible_host=${valkey_ip} ansible_user=ubuntu
 
 [all:vars]
 ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyCommand="ssh -W %h:%p -q ubuntu@${load_balancer_public_ip}"'
+ansible_python_interpreter=/usr/bin/python3

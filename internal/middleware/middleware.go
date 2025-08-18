@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"time"
 
+	"bulbul/internal/cache"
+	"bulbul/internal/models"
 	"bulbul/internal/repository"
 
 	"github.com/gin-gonic/gin"
@@ -70,8 +72,8 @@ func Recovery() gin.HandlerFunc {
 	return gin.Recovery()
 }
 
-// BasicAuth аутентифицирует пользователя по HTTP Basic Auth, проверяя логин/пароль в БД
-func BasicAuth(userRepo *repository.UserRepository) gin.HandlerFunc {
+// BasicAuth аутентифицирует пользователя по HTTP Basic Auth, проверяя логин/пароль в кеше Valkey, затем в БД
+func BasicAuth(userRepo *repository.UserRepository, valkeyClient *cache.ValkeyClient) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		username, password, ok := c.Request.BasicAuth()
 		if !ok {
@@ -82,25 +84,36 @@ func BasicAuth(userRepo *repository.UserRepository) gin.HandlerFunc {
 
 		// По умолчанию используем email как username
 		ctx := c.Request.Context()
-		user, err := userRepo.GetByEmail(ctx, username)
+
+		// Вычисляем SHA-256 хеш введенного пароля для поиска в кеше
+		hash := sha256.Sum256([]byte(password))
+		passwordHash := fmt.Sprintf("%x", hash)
+
+		var userID int64
+		var user *models.User
+		var err error
+
+		// Сначала пытаемся найти пользователя в кеше Valkey
+		if valkeyClient != nil {
+			userID, err = valkeyClient.GetUserIDByAuth(ctx, username, passwordHash)
+			if err == nil {
+				c.Set("user_id", userID)
+				c.Request = c.Request.WithContext(ContextWithUserID(c.Request.Context(), userID))
+				c.Next()
+				return
+			}
+		}
+
+		// Fallback: поиск в базе данных
+		user, err = userRepo.GetByEmail(ctx, username)
 		if err != nil || user == nil || !user.IsActive {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
 			return
 		}
 
-		// Проверяем пароль: SHA-256 хеш, затем fallback на plain (если задан)
 		verified := false
 		if user.PasswordHash != "" {
-			// Вычисляем SHA-256 хеш введенного пароля
-			hash := sha256.Sum256([]byte(password))
-			passwordHash := fmt.Sprintf("%x", hash)
-
 			if passwordHash == user.PasswordHash {
-				verified = true
-			}
-		}
-		if !verified && user.PasswordPlain != nil {
-			if *user.PasswordPlain == password {
 				verified = true
 			}
 		}
