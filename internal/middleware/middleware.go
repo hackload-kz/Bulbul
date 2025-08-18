@@ -110,10 +110,7 @@ func BasicAuth(userRepo *repository.UserRepository) gin.HandlerFunc {
 			return
 		}
 
-		// Сохраняем пользователя в контекст запроса
-		c.Set("user", user)
 		c.Set("user_id", user.UserID)
-		// Также прокидываем user_id в request context для service-слоя
 		c.Request = c.Request.WithContext(ContextWithUserID(c.Request.Context(), user.UserID))
 
 		c.Next()
