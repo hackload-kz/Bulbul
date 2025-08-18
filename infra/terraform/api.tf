@@ -1,5 +1,5 @@
 resource "openstack_blockstorage_volume_v3" "api_server_disk" {
-  count                = var.api_server_count
+  count                = var.vms_enabled ? var.api_server_count : 0
   name                 = "api-server-volume"
   volume_type          = "ceph-ssd"
   size                 = 10
@@ -14,7 +14,7 @@ resource "openstack_networking_port_v2" "api_server_port" {
 }
 
 resource "openstack_compute_instance_v2" "api_server" {
-  count = var.api_server_count
+  count                = var.vms_enabled ? var.api_server_count : 0
   name        = "api-server-${count.index}"
   flavor_name = "d1.ram4cpu4"
   key_pair    = openstack_compute_keypair_v2.ssh.name

@@ -6,10 +6,6 @@ lb-1 ansible_host=${load_balancer_public_ip} ansible_user=ubuntu
 ${server.name} ansible_host=${server.ip} ansible_user=ubuntu
 %{ endfor ~}
 
-[backend_servers:children]
-api_servers
-consumer_servers
-
 [postgres]
 ${postgres_ip}
 

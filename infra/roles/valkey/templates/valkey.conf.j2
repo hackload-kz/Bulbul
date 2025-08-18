@@ -40,6 +40,7 @@ dir /var/lib/valkey
 
 # AOF (DISABLED)
 appendonly {{ valkey_appendonly }}
+appendfsync {{ valkey_appendfsync }}
 
 # Performance optimizations
 # Disable background saving

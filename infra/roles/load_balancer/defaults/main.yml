@@ -12,3 +12,6 @@ backend_servers:
 worker_processes: "auto"
 worker_connections: 65535
 client_max_body_size: "100M"
+
+# IP forwarding configuration
+enable_ipv6: true

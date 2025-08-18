@@ -17,6 +17,15 @@
     - postgresql
   tags: postgresql
 
+- name: Provision valkey
+  hosts: valkey
+  become: yes
+  gather_facts: yes
+  
+  roles:
+    - valkey
+  tags: valkey
+
 - name: Provision Backend Servers
   hosts: backend_servers
   become: yes

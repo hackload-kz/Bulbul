@@ -21,7 +21,7 @@ host    all             postgres        172.16.0.0/12           scram-sha-256
 host    all             postgres        192.168.0.0/16          scram-sha-256
 
 # Allow application user from anywhere (adjust as needed for security)
-host    {{ postgresql_database }}    {{ postgresql_user }}    0.0.0.0/0               scram-sha-256
+host    {{ postgresql_database }}    postgres    0.0.0.0/0               scram-sha-256
 
 # Replication connections
 local   replication     all                                     peer

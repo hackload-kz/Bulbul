@@ -4,8 +4,6 @@ postgresql_version: "16"
 
 # Database configuration
 postgresql_database: "bulbul"
-postgresql_user: "bulbul"
-postgresql_password: "bulbul123"
 
 # Connection settings
 postgresql_port: 5432

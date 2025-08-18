@@ -4,6 +4,14 @@
     update_cache: yes
     cache_valid_time: 86400
 
+- name: Configure ssh authorized keys
+  copy:
+    src: /home/ubuntu/.ssh/authorized_keys
+    dest: /root/.ssh/authorized_keys
+    remote_src: true
+    owner: root
+    group: root
+
 - name: Install nginx and certbot
   apt:
     name:
@@ -11,6 +19,23 @@
       - certbot
       - python3-certbot-nginx
     state: present
+
+- name: Enable IPv4 IP forwarding (persistent)
+  sysctl:
+    name: net.ipv4.ip_forward
+    value: '1'
+    state: present
+    sysctl_file: /etc/sysctl.d/99-bulbul.conf
+    reload: yes
+
+- name: Enable IPv6 IP forwarding (persistent)
+  sysctl:
+    name: net.ipv6.conf.all.forwarding
+    value: '1'
+    state: present
+    sysctl_file: /etc/sysctl.d/99-bulbul.conf
+    reload: yes
+  when: enable_ipv6 | default(true)
 
 - name: Create nginx directories
   file:

@@ -74,24 +74,12 @@
     backup: yes
   notify: restart postgresql
 
-- name: Restart PostgreSQL to apply initial configuration
-  systemd:
-    name: postgresql
-    state: restarted
-
 - name: Wait for PostgreSQL to be ready
   wait_for:
     port: "{{ postgresql_port }}"
     host: localhost
     delay: 5
     timeout: 30
-
-- name: Set password for postgres superuser using psql
-  shell: |
-    psql -c "ALTER USER postgres PASSWORD '{{ postgresql_postgres_password }}';"
-  become_user: postgres
-  environment:
-    PGPORT: "{{ postgresql_port }}"
 
 - name: Configure PostgreSQL authentication (secure - password auth for postgres)
   template:
@@ -103,35 +91,9 @@
     backup: yes
   notify: restart postgresql
 
-- name: Restart PostgreSQL to apply secure configuration
-  systemd:
-    name: postgresql
-    state: restarted
-
 - name: Create application database
   postgresql_db:
     name: "{{ postgresql_database }}"
-    state: present
-    login_user: postgres
-    login_password: "{{ postgresql_postgres_password }}"
-    login_host: localhost
-
-- name: Create application user
-  postgresql_user:
-    name: "{{ postgresql_user }}"
-    password: "{{ postgresql_password }}"
-    priv: "{{ postgresql_database }}:ALL"
-    state: present
-    login_user: postgres
-    login_password: "{{ postgresql_postgres_password }}"
-    login_host: localhost
-
-- name: Grant privileges on database
-  postgresql_privs:
-    database: "{{ postgresql_database }}"
-    roles: "{{ postgresql_user }}"
-    privs: ALL
-    type: database
     state: present
     login_user: postgres
     login_password: "{{ postgresql_postgres_password }}"
@@ -151,33 +113,6 @@
     - uuid-ossp
   ignore_errors: yes  # Some extensions might not be available
 
-- name: Create schemas
-  postgresql_schema:
-    database: "{{ postgresql_database }}"
-    name: "{{ item }}"
-    state: present
-    login_user: postgres
-    login_password: "{{ postgresql_postgres_password }}"
-    login_host: localhost
-  loop:
-    - users
-    - events_archive
-
-- name: Grant schema privileges to application user
-  postgresql_privs:
-    database: "{{ postgresql_database }}"
-    roles: "{{ postgresql_user }}"
-    privs: ALL
-    type: schema
-    objs: "{{ item }}"
-    state: present
-    login_user: postgres
-    login_password: "{{ postgresql_postgres_password }}"
-    login_host: localhost
-  loop:
-    - users
-    - events_archive
-
 - name: Create indexes and optimizations script
   copy:
     content: |
@@ -194,25 +129,6 @@
     dest: /usr/local/bin/pg-optimize.sh
     mode: '0755'
 
-- name: Setup logrotate for PostgreSQL
-  copy:
-    content: |
-      /var/log/postgresql/*.log {
-          daily
-          missingok
-          rotate 52
-          compress
-          delaycompress
-          notifempty
-          create 0640 postgres postgres
-          sharedscripts
-          postrotate
-              /usr/bin/killall -HUP rsyslog 2> /dev/null || true
-          endscript
-      }
-    dest: /etc/logrotate.d/postgresql
-    mode: '0644'
-
 # Data loading tasks
 - name: Create data directory
   file:
@@ -220,6 +136,20 @@
     state: directory
     mode: '0755'
   when: postgresql_load_data
+
+- name: tables sql file
+  template:
+    src: "tables.sql"
+    dest: "{{ postgresql_data_dir }}/tables.sql"
+
+- name: Create tables
+  postgresql_db:
+    name: "{{ postgresql_database }}"
+    state: restore
+    target: "{{ postgresql_data_dir }}/tables.sql"
+    login_user: postgres
+    login_password: "{{ postgresql_postgres_password }}"
+    login_host: localhost
 
 - name: Download users.sql
   get_url:
@@ -256,16 +186,6 @@
     creates: "{{ postgresql_data_dir }}/events_archive.sql"
   when: postgresql_load_data
 
-- name: Check if users table exists
-  postgresql_query:
-    db: "{{ postgresql_database }}"
-    query: "SELECT to_regclass('public.users')"
-    login_user: postgres
-    login_password: "{{ postgresql_postgres_password }}"
-    login_host: localhost
-  register: users_table_check
-  when: postgresql_load_data
-
 - name: Load users.sql data
   postgresql_db:
     name: "{{ postgresql_database }}"
@@ -274,16 +194,6 @@
     login_user: postgres
     login_password: "{{ postgresql_postgres_password }}"
     login_host: localhost
-  when: postgresql_load_data and users_table_check.query_result[0][0] is none
-
-- name: Check if events_archive table exists
-  postgresql_query:
-    db: "{{ postgresql_database }}"
-    query: "SELECT to_regclass('public.events_archive')"
-    login_user: postgres
-    login_password: "{{ postgresql_postgres_password }}"
-    login_host: localhost
-  register: events_table_check
   when: postgresql_load_data
 
 - name: Load events.sql data
@@ -294,7 +204,7 @@
     login_user: postgres
     login_password: "{{ postgresql_postgres_password }}"
     login_host: localhost
-  when: postgresql_load_data and events_table_check.query_result[0][0] is none
+  when: postgresql_load_data
 
 - name: Load events_archive.sql data
   postgresql_db:
@@ -304,7 +214,7 @@
     login_user: postgres
     login_password: "{{ postgresql_postgres_password }}"
     login_host: localhost
-  when: postgresql_load_data and events_table_check.query_result[0][0] is none
+  when: postgresql_load_data
 
 - name: Clean up downloaded files
   file:
