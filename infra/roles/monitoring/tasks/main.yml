@@ -1,4 +1,12 @@
 ---
+- name: Configure ssh authorized keys
+  copy:
+    src: /home/ubuntu/.ssh/authorized_keys
+    dest: /root/.ssh/authorized_keys
+    remote_src: true
+    owner: root
+    group: root
+    
 - name: Update apt cache
   apt:
     update_cache: yes

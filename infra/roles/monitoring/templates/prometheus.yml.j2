@@ -18,7 +18,7 @@ scrape_configs:
     static_configs:
       - targets:
 {% for host in load_balancer_hosts %}
-        - '{{ hostvars[host]["private_ip"] | default(hostvars[host]["ansible_host"]) }}:{{ node_exporter_port }}'
+        - '{{ hostvars[host]["ansible_host"] }}:{{ node_exporter_port }}'
 {% endfor %}
     scrape_interval: {{ scrape_interval }}
     metrics_path: /metrics
@@ -59,21 +59,3 @@ scrape_configs:
     scrape_interval: {{ scrape_interval }}
     metrics_path: /metrics
 {% endif %}
-
-  # Monitoring server itself
-{% if monitoring_hosts %}
-  - job_name: 'monitoring'
-    static_configs:
-      - targets:
-{% for host in monitoring_hosts %}
-        - '{{ hostvars[host]["ansible_host"] }}:{{ node_exporter_port }}'
-{% endfor %}
-    scrape_interval: {{ scrape_interval }}
-    metrics_path: /metrics
-{% endif %}
-
-  # Grafana monitoring
-  - job_name: 'grafana'
-    static_configs:
-      - targets: ['localhost:{{ grafana_port }}']
-    metrics_path: /metrics

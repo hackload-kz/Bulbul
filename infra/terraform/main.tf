@@ -35,7 +35,11 @@ resource "openstack_networking_subnet_v2" "private_subnet" {
   enable_dhcp      = true
 }
 
-resource "openstack_networking_floatingip_v2" "instance_fip" {
+resource "openstack_networking_floatingip_v2" "lb_fip" {
+  pool = "FloatingIP Net"
+}
+
+resource "openstack_networking_floatingip_v2" "monitoring_fip" {
   pool = "FloatingIP Net"
 }
 

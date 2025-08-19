@@ -32,3 +32,8 @@ resource "openstack_compute_instance_v2" "monitoring_server" {
     delete_on_termination = false
   }
 }
+
+resource "openstack_networking_floatingip_associate_v2" "monitoring_fip_association" {
+  floating_ip = openstack_networking_floatingip_v2.monitoring_fip.address
+  port_id     = openstack_networking_port_v2.monitoring_port.id
+}

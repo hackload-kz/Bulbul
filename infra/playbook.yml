@@ -1,13 +1,4 @@
 ---
-- name: Provision node exporters
-  hosts: all
-  become: yes
-  gather_facts: yes
-  
-  roles:
-    - node_exporter
-  tags: monitoring
-
 - name: Provision monitoring
   hosts: monitoring
   become: yes
@@ -17,6 +8,14 @@
     - monitoring
   tags: monitoring
 
+- name: Provision node exporters
+  hosts: all
+  become: yes
+  gather_facts: yes
+  
+  roles:
+    - node_exporter
+  tags: monitoring
 
 - name: Provision Load Balancer
   hosts: load_balancer

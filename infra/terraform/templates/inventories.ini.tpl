@@ -1,5 +1,5 @@
 [load_balancer]
-lb-1 ansible_host=${load_balancer_public_ip} ansible_user=ubuntu
+lb-1 ansible_host=${load_balancer_private_ip} ansible_user=ubuntu
 
 [api_servers]
 %{ for server in api_servers ~}
@@ -13,8 +13,8 @@ postgres_server ansible_host=${postgres_ip} ansible_user=ubuntu
 valkey_server ansible_host=${valkey_ip} ansible_user=ubuntu
 
 [monitoring]
-monitoring_server ansible_host=${monitoring_ip} ansible_user=ubuntu
+monitoring_server ansible_host=${monitoring_public_ip} ansible_user=ubuntu
 
 [all:vars]
-ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyCommand="ssh -W %h:%p -q ubuntu@${load_balancer_public_ip}"'
+ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyCommand="ssh -W %h:%p -q ubuntu@${monitoring_public_ip}"'
 ansible_python_interpreter=/usr/bin/python3

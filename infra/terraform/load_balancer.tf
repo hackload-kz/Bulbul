@@ -33,7 +33,7 @@ resource "openstack_networking_port_v2" "lb_port" {
   security_group_ids = [openstack_networking_secgroup_v2.default_group.id]
 }
 
-resource "openstack_networking_floatingip_associate_v2" "instance_fip_association" {
-  floating_ip = openstack_networking_floatingip_v2.instance_fip.address
+resource "openstack_networking_floatingip_associate_v2" "lb_fip_association" {
+  floating_ip = openstack_networking_floatingip_v2.lb_fip.address
   port_id     = openstack_networking_port_v2.lb_port.id
 }
