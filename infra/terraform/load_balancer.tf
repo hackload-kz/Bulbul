@@ -10,7 +10,7 @@ resource "openstack_blockstorage_volume_v3" "lb_disk" {
 resource "openstack_compute_instance_v2" "lb" {
   count = var.vms_enabled ? 1 : 0
   name              = "load-balancer"
-  flavor_name       = "d1.ram1cpu1"
+  flavor_name       = "d1.ram4cpu4"
   key_pair          = openstack_compute_keypair_v2.ssh.name
 
   user_data       = file("${path.module}/resources/cloud-init.yml")

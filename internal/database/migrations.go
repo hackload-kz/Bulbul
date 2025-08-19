@@ -14,7 +14,7 @@ func (db *DB) RunMigrations() error {
 		createSeatsTable,
 		createBookingsTable,
 		createBookingSeatsTable,
-		addFullTextSearchToEvents,
+		// addFullTextSearchToEvents,
 	}
 
 	for i, migration := range migrations {
