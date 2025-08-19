@@ -147,6 +147,44 @@
     mode: '0644'
   notify: restart grafana
 
+- name: Create Grafana provisioning directories
+  file:
+    path: "{{ grafana_config_dir }}/provisioning/{{ item }}"
+    state: directory
+    owner: "{{ grafana_user }}"
+    group: "{{ grafana_group }}"
+    mode: '0755'
+  loop:
+    - datasources
+    - dashboards
+
+- name: Create Prometheus datasource configuration
+  template:
+    src: provisioning/datasources/prometheus.yml.j2
+    dest: "{{ grafana_config_dir }}/provisioning/datasources/prometheus.yml"
+    owner: "{{ grafana_user }}"
+    group: "{{ grafana_group }}"
+    mode: '0644'
+  notify: restart grafana
+
+- name: Create dashboard provider configuration
+  template:
+    src: provisioning/dashboards/dashboard-provider.yml.j2
+    dest: "{{ grafana_config_dir }}/provisioning/dashboards/dashboard.yml"
+    owner: "{{ grafana_user }}"
+    group: "{{ grafana_group }}"
+    mode: '0644'
+  notify: restart grafana
+
+- name: Create system monitoring dashboard
+  template:
+    src: provisioning/dashboards/system-monitoring.json.j2
+    dest: "{{ grafana_config_dir }}/provisioning/dashboards/system-monitoring.json"
+    owner: "{{ grafana_user }}"
+    group: "{{ grafana_group }}"
+    mode: '0644'
+  notify: restart grafana
+
 - name: Create Grafana systemd service
   template:
     src: grafana.service.j2

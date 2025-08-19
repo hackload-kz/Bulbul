@@ -1,12 +1,12 @@
 ---
-# - name: Provision node exporters
-#   hosts: all
-#   become: yes
-#   gather_facts: yes
+- name: Provision node exporters
+  hosts: all
+  become: yes
+  gather_facts: yes
   
-#   roles:
-#     - node_exporter
-#   tags: monitoring
+  roles:
+    - node_exporter
+  tags: monitoring
 
 - name: Provision monitoring
   hosts: monitoring
