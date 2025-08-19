@@ -130,9 +130,14 @@ func (v *ValkeyClient) SetEventsList(ctx context.Context, page, pageSize int, ev
 		return fmt.Errorf("failed to marshal events data: %w", err)
 	}
 	
+	// Use background context with timeout for cache SET operations (non-blocking)
+	// This prevents cache writes from affecting response times
+	cacheCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	
 	// Use regular Do() for SET operations (not cacheable)
 	serverTTL := v.eventsCacheTTL
-	err = v.client.Do(ctx,
+	err = v.client.Do(cacheCtx,
 		v.client.B().Set().Key(cacheKey).Value(string(eventData)).Ex(serverTTL).Build(),
 	).Error()
 	
@@ -146,8 +151,12 @@ func (v *ValkeyClient) SetEventsList(ctx context.Context, page, pageSize int, ev
 func (v *ValkeyClient) GetEventsList(ctx context.Context, page, pageSize int, result interface{}) error {
 	cacheKey := v.generateEventsListCacheKey(page, pageSize)
 	
+	// Create a timeout context for cache operations (2 seconds max)
+	cacheCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	
 	// Use client-side caching for GET operations
-	resp := v.client.DoCache(ctx,
+	resp := v.client.DoCache(cacheCtx,
 		v.client.B().Get().Key(cacheKey).Cache(),
 		v.eventsCacheTTL,
 	)
@@ -156,6 +165,10 @@ func (v *ValkeyClient) GetEventsList(ctx context.Context, page, pageSize int, re
 	if err != nil {
 		if rueidis.IsRedisNil(err) {
 			return fmt.Errorf("cache miss")
+		}
+		// Check for context timeout/cancellation
+		if ctx.Err() != nil {
+			return fmt.Errorf("cache operation cancelled: %w", ctx.Err())
 		}
 		return fmt.Errorf("cache lookup error: %w", err)
 	}
@@ -174,12 +187,17 @@ func (v *ValkeyClient) GetEventsList(ctx context.Context, page, pageSize int, re
 func (v *ValkeyClient) GetEventsListRaw(ctx context.Context, page, pageSize int) ([]byte, error) {
 	cacheKey := v.generateEventsListCacheKey(page, pageSize)
 	
+	// Create a timeout context for cache operations (2 seconds max)
+	cacheCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	
 	// Use client-side caching with raw bytes for maximum performance
-	resp := v.client.DoCache(ctx,
+	resp := v.client.DoCache(cacheCtx,
 		v.client.B().Get().Key(cacheKey).Cache(),
 		v.eventsCacheTTL,
 	)
 	
+	// Check if served from client-side cache
 	if resp.IsCacheHit() {
 		// Ultra-fast path: served directly from client-side memory
 	}
@@ -188,6 +206,10 @@ func (v *ValkeyClient) GetEventsListRaw(ctx context.Context, page, pageSize int)
 	if err != nil {
 		if rueidis.IsRedisNil(err) {
 			return nil, fmt.Errorf("cache miss")
+		}
+		// Check for context timeout/cancellation
+		if ctx.Err() != nil {
+			return nil, fmt.Errorf("cache operation cancelled: %w", ctx.Err())
 		}
 		return nil, fmt.Errorf("cache lookup error: %w", err)
 	}

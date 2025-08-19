@@ -77,12 +77,13 @@ func NewServer(cfg *config.Config) *Server {
 		slog.Info("Successfully connected to Valkey cache")
 	}
 
-	// Создаем роутер
-	router := gin.Default()
+	// Создаем роутер с явной настройкой middleware
+	router := gin.New()
 
-	// Применяем middleware
-	router.Use(middleware.CORS())
-	router.Use(middleware.Logger())
+	// Применяем middleware в правильном порядке
+	router.Use(middleware.Logger())     // Логирование запросов
+	router.Use(middleware.Recovery())   // Кастомное восстановление после паники
+	router.Use(middleware.CORS())       // CORS headers
 
 	// Создаем сервер
 	server := &Server{

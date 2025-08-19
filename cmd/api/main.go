@@ -53,11 +53,12 @@ func main() {
 
 	// Создаем HTTP сервер
 	srv := &http.Server{
-		Addr:         ":" + cfg.Port,
-		Handler:      server.GetRouter(),
-		ReadTimeout:  cfg.RequestTimeout,
-		WriteTimeout: cfg.RequestTimeout,
-		IdleTimeout:  time.Minute,
+		Addr:              ":" + cfg.Port,
+		Handler:           server.GetRouter(),
+		ReadTimeout:       cfg.RequestTimeout,
+		WriteTimeout:      cfg.RequestTimeout,
+		IdleTimeout:       2 * time.Minute,
+		MaxHeaderBytes:    1 << 20, // 1MB
 	}
 
 	// Запускаем сервер в отдельной горутине

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"log"
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -51,6 +52,25 @@ func (h *Handlers) CreateEvent(c *gin.Context) {
 // ListEvents - GET /api/events
 // Получить список событий
 func (h *Handlers) ListEvents(c *gin.Context) {
+	// Add explicit panic recovery for this critical handler
+	defer func() {
+		if r := recover(); r != nil {
+			requestID, _ := c.Get("request_id")
+			slog.Error("PANIC in ListEvents handler",
+				"panic", r,
+				"request_id", requestID,
+				"method", c.Request.Method,
+				"path", c.Request.URL.Path,
+				"query", c.Request.URL.RawQuery)
+			if !c.Writer.Written() {
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"error": "Internal server error",
+					"request_id": requestID,
+				})
+			}
+		}
+	}()
+	
 	query := c.Query("query")
 	date := c.Query("date")
 

@@ -95,9 +95,32 @@ func Logger() gin.HandlerFunc {
 	}
 }
 
-// Recovery middleware для восстановления после паники
+// Recovery middleware для восстановления после паники с детальным логированием
 func Recovery() gin.HandlerFunc {
-	return gin.Recovery()
+	return gin.CustomRecovery(func(c *gin.Context, recovered interface{}) {
+		// Получаем request ID для трассировки
+		requestID, _ := c.Get("request_id")
+		
+		// Логируем панику с максимумом информации
+		slog.Error("PANIC recovered",
+			"request_id", requestID,
+			"panic", recovered,
+			"method", c.Request.Method,
+			"path", c.Request.URL.Path,
+			"query", c.Request.URL.RawQuery,
+			"client_ip", c.ClientIP(),
+			"user_agent", c.Request.UserAgent(),
+			"headers", c.Request.Header,
+		)
+		
+		// Отправляем правильный HTTP ответ клиенту
+		if !c.Writer.Written() {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error":      "Internal server error",
+				"request_id": requestID,
+			})
+		}
+	})
 }
 
 // BasicAuth аутентифицирует пользователя по HTTP Basic Auth, проверяя логин/пароль в кеше Valkey, затем в БД

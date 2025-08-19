@@ -4,6 +4,7 @@ upstream backend {
 {% for host in groups['api_servers'] %}
     server {{ hostvars[host]['ansible_host'] }}:8081 max_fails=3 fail_timeout=30s;
 {% endfor %}
+    keepalive 32;
 }
 
 # HTTP server (initial setup for certbot)
@@ -22,7 +23,7 @@ server {
         proxy_pass http://backend;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
+        proxy_set_header Connection "";
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -30,6 +31,7 @@ server {
         proxy_cache_bypass $http_upgrade;
         proxy_read_timeout 300s;
         proxy_connect_timeout 75s;
+        proxy_send_timeout 300s;
     }
 
     # Health check endpoint

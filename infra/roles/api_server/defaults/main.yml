@@ -21,6 +21,7 @@ api_server_restart_sec: "5"
 gin_mode: "release"
 log_level: "info"
 log_format: "json"
+request_timeout_sec: 300
 
 # Database configuration (PostgreSQL)
 postgres_host: "{{ hostvars[groups['postgres'][0]]['ansible_host'] }}"
