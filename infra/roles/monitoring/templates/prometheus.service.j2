@@ -1,0 +1,26 @@
+[Unit]
+Description=Prometheus
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User={{ prometheus_user }}
+Group={{ prometheus_group }}
+Type=simple
+ExecStart=/usr/local/bin/prometheus \
+    --config.file={{ prometheus_config_dir }}/prometheus.yml \
+    --storage.tsdb.path={{ prometheus_data_dir }} \
+    --web.console.templates={{ prometheus_config_dir }}/consoles \
+    --web.console.libraries={{ prometheus_config_dir }}/console_libraries \
+    --web.listen-address=0.0.0.0:{{ prometheus_port }} \
+    --web.external-url=http://{{ ansible_host }}:{{ prometheus_port }}/ \
+    --storage.tsdb.retention.time={{ prometheus_retention }}
+{% if prometheus_storage_retention_size != "0" %}
+    --storage.tsdb.retention.size={{ prometheus_storage_retention_size }}
+{% endif %}
+
+Restart={{ restart_policy }}
+RestartSec={{ restart_sec }}
+
+[Install]
+WantedBy=multi-user.target

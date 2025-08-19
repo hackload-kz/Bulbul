@@ -1,0 +1,54 @@
+---
+# Node Exporter configuration
+node_exporter_version: "1.6.1"
+node_exporter_user: "node_exporter"
+node_exporter_group: "node_exporter"
+node_exporter_port: 9100
+node_exporter_bin_dir: "/usr/local/bin"
+node_exporter_config_dir: "/etc/node_exporter"
+node_exporter_data_dir: "/var/lib/node_exporter"
+
+# Download configuration
+node_exporter_download_url: "https://github.com/prometheus/node_exporter/releases/download/v{{ node_exporter_version }}/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
+
+# Service configuration
+node_exporter_service_name: "node_exporter"
+restart_policy: "always"
+restart_sec: "5"
+
+# Collector configuration
+node_exporter_enabled_collectors:
+  - systemd
+  - textfile
+  - processes
+  - cpu
+  - diskstats
+  - filesystem
+  - loadavg
+  - meminfo
+  - netdev
+  - stat
+  - time
+  - uname
+
+node_exporter_disabled_collectors:
+  - arp
+  - bcache
+  - bonding
+  - conntrack
+  - hwmon
+  - infiniband
+  - ipvs
+  - mdadm
+  - netclass
+  - netstat
+  - nfs
+  - nfsd
+  - sockstat
+  - timex
+  - vmstat
+  - xfs
+  - zfs
+
+# Text file collector directory
+node_exporter_textfile_dir: "{{ node_exporter_data_dir }}/textfile_collector"

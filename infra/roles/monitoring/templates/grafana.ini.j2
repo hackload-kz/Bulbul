@@ -1,0 +1,83 @@
+[DEFAULT]
+instance_name = {{ ansible_hostname }}
+
+[paths]
+data = {{ grafana_data_dir }}
+logs = {{ grafana_log_dir }}
+plugins = {{ grafana_data_dir }}/plugins
+provisioning = {{ grafana_config_dir }}/provisioning
+
+[server]
+protocol = http
+http_addr = 0.0.0.0
+http_port = {{ grafana_port }}
+domain = {{ ansible_host }}
+root_url = http://{{ ansible_host }}:{{ grafana_port }}/
+serve_from_sub_path = false
+
+[database]
+type = {{ grafana_database_type }}
+path = {{ grafana_data_dir }}/grafana.db
+
+[session]
+provider = file
+provider_config = sessions
+
+[dataproxy]
+logging = false
+
+[analytics]
+reporting_enabled = false
+check_for_updates = false
+
+[security]
+admin_user = {{ grafana_admin_user }}
+admin_password = {{ grafana_admin_password }}
+allow_embedding = false
+
+[snapshots]
+external_enabled = true
+external_snapshot_url = https://snapshots-origin.raintank.io
+external_snapshot_name = Publish to snapshot.raintank.io
+
+[dashboards]
+versions_to_keep = 20
+
+[users]
+allow_sign_up = false
+allow_org_create = false
+auto_assign_org = true
+auto_assign_org_id = 1
+auto_assign_org_role = Viewer
+default_theme = dark
+
+[auth]
+disable_login_form = false
+
+[auth.anonymous]
+enabled = false
+
+[log]
+mode = console file
+level = info
+
+[log.console]
+level = info
+format = console
+
+[log.file]
+level = info
+format = text
+log_rotate = true
+max_lines = 1000000
+max_size_shift = 28
+daily_rotate = true
+max_days = 7
+
+[alerting]
+enabled = true
+execute_alerts = true
+
+[metrics]
+enabled = true
+interval_seconds = 10

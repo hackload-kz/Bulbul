@@ -1,0 +1,79 @@
+global:
+  scrape_interval: {{ scrape_interval }}
+  evaluation_interval: {{ evaluation_interval }}
+
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:{{ prometheus_port }}']
+
+  # Load Balancer monitoring
+{% if load_balancer_hosts %}
+  - job_name: 'load_balancer'
+    static_configs:
+      - targets:
+{% for host in load_balancer_hosts %}
+        - '{{ hostvars[host]["private_ip"] | default(hostvars[host]["ansible_host"]) }}:{{ node_exporter_port }}'
+{% endfor %}
+    scrape_interval: {{ scrape_interval }}
+    metrics_path: /metrics
+{% endif %}
+
+  # API Servers monitoring
+{% if api_server_hosts %}
+  - job_name: 'api_servers'
+    static_configs:
+      - targets:
+{% for host in api_server_hosts %}
+        - '{{ hostvars[host]["ansible_host"] }}:{{ node_exporter_port }}'
+{% endfor %}
+    scrape_interval: {{ scrape_interval }}
+    metrics_path: /metrics
+{% endif %}
+
+  # PostgreSQL monitoring
+{% if postgres_hosts %}
+  - job_name: 'postgresql'
+    static_configs:
+      - targets:
+{% for host in postgres_hosts %}
+        - '{{ hostvars[host]["ansible_host"] }}:{{ node_exporter_port }}'
+{% endfor %}
+    scrape_interval: {{ scrape_interval }}
+    metrics_path: /metrics
+{% endif %}
+
+  # Valkey (Redis) monitoring
+{% if valkey_hosts %}
+  - job_name: 'valkey'
+    static_configs:
+      - targets:
+{% for host in valkey_hosts %}
+        - '{{ hostvars[host]["ansible_host"] }}:{{ node_exporter_port }}'
+{% endfor %}
+    scrape_interval: {{ scrape_interval }}
+    metrics_path: /metrics
+{% endif %}
+
+  # Monitoring server itself
+{% if monitoring_hosts %}
+  - job_name: 'monitoring'
+    static_configs:
+      - targets:
+{% for host in monitoring_hosts %}
+        - '{{ hostvars[host]["ansible_host"] }}:{{ node_exporter_port }}'
+{% endfor %}
+    scrape_interval: {{ scrape_interval }}
+    metrics_path: /metrics
+{% endif %}
+
+  # Grafana monitoring
+  - job_name: 'grafana'
+    static_configs:
+      - targets: ['localhost:{{ grafana_port }}']
+    metrics_path: /metrics

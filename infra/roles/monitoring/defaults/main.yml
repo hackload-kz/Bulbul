@@ -1,0 +1,47 @@
+---
+# Prometheus configuration
+prometheus_version: "2.47.0"
+prometheus_user: "prometheus"
+prometheus_group: "prometheus"
+prometheus_data_dir: "/var/lib/prometheus"
+prometheus_config_dir: "/etc/prometheus"
+prometheus_log_dir: "/var/log/prometheus"
+prometheus_port: 9090
+prometheus_retention: "15d"
+prometheus_storage_retention_size: "0"
+
+# Grafana configuration
+grafana_version: "10.1.2"
+grafana_user: "grafana"
+grafana_group: "grafana"
+grafana_data_dir: "/var/lib/grafana"
+grafana_config_dir: "/etc/grafana"
+grafana_log_dir: "/var/log/grafana"
+grafana_port: 3000
+grafana_admin_user: "admin"
+grafana_admin_password: "admin123"
+grafana_database_type: "sqlite3"
+
+# Download URLs
+prometheus_download_url: "https://github.com/prometheus/prometheus/releases/download/v{{ prometheus_version }}/prometheus-{{ prometheus_version }}.linux-amd64.tar.gz"
+grafana_download_url: "https://dl.grafana.com/oss/release/grafana-{{ grafana_version }}.linux-amd64.tar.gz"
+
+# Service configuration
+prometheus_service_name: "prometheus"
+grafana_service_name: "grafana-server"
+restart_policy: "always"
+restart_sec: "5"
+
+# Scrape targets configuration
+scrape_interval: "15s"
+evaluation_interval: "15s"
+
+# Node exporter configuration
+node_exporter_port: 9100
+
+# Server groups for scraping
+load_balancer_hosts: "{{ groups['load_balancer'] | default([]) }}"
+api_server_hosts: "{{ groups['api_servers'] | default([]) }}"
+postgres_hosts: "{{ groups['postgres'] | default([]) }}"
+valkey_hosts: "{{ groups['valkey'] | default([]) }}"
+monitoring_hosts: "{{ groups['monitoring'] | default([]) }}"
