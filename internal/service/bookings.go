@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"bulbul/internal/external"
+	"bulbul/internal/logger"
 	"bulbul/internal/messaging"
 	"bulbul/internal/middleware"
 	"bulbul/internal/models"
@@ -85,7 +86,10 @@ func (s *BookingService) Create(ctx context.Context, req *models.CreateBookingRe
 
 	if err := s.natsClient.Publish(models.EventBookingCreated, event_data); err != nil {
 		// Log error but don't fail the operation
-		fmt.Printf("Failed to publish booking created event: %v", err)
+		logger.WithContext(ctx).Error("Failed to publish booking created event",
+			"error", err,
+			"booking_id", booking.ID,
+			"event_type", "booking.created")
 	}
 
 	return &models.CreateBookingResponse{ID: booking.ID}, nil
@@ -170,7 +174,9 @@ func (s *BookingService) InitiatePayment(ctx context.Context, req *models.Initia
 
 		if err := s.natsClient.Publish(models.EventPaymentInitiated, event); err != nil {
 			// Log error but don't fail the operation
-			fmt.Printf("Failed to publish payment initiated event: %v", err)
+			logger.WithContext(ctx).Error("Failed to publish payment initiated event",
+				"error", err,
+				"event_type", "payment.initiated")
 		}
 
 		// Return payment URL
@@ -211,7 +217,9 @@ func (s *BookingService) Cancel(ctx context.Context, req *models.CancelBookingRe
 	for _, seat := range seats {
 		if err := s.seatRepo.ReleaseSeat(ctx, seat.ID); err != nil {
 			// Log error but continue
-			fmt.Printf("Failed to release seat %s: %v", seat.ID, err)
+			logger.WithContext(ctx).Error("Failed to release seat during booking cancellation",
+				"error", err,
+				"seat_id", seat.ID)
 		}
 	}
 
@@ -219,7 +227,9 @@ func (s *BookingService) Cancel(ctx context.Context, req *models.CancelBookingRe
 	if booking.PaymentID != nil && booking.PaymentStatus == "INITIATED" {
 		if err := s.paymentClient.CancelPayment(*booking.PaymentID, "Booking cancelled by user"); err != nil {
 			// Log error but continue
-			fmt.Printf("Failed to cancel payment %s: %v", *booking.PaymentID, err)
+			logger.WithContext(ctx).Error("Failed to cancel payment during booking cancellation",
+				"error", err,
+				"payment_id", *booking.PaymentID)
 		}
 	}
 
@@ -242,7 +252,9 @@ func (s *BookingService) Cancel(ctx context.Context, req *models.CancelBookingRe
 
 	if err := s.natsClient.Publish(models.EventBookingCancelled, event); err != nil {
 		// Log error but don't fail the operation
-		fmt.Printf("Failed to publish booking cancelled event: %v", err)
+		logger.WithContext(ctx).Error("Failed to publish booking cancelled event",
+			"error", err,
+			"event_type", "booking.cancelled")
 	}
 
 	return nil
@@ -255,8 +267,9 @@ func (s *BookingService) HandlePaymentNotification(ctx context.Context, notifica
 	// 2. Update booking status based on notification status
 	// 3. Confirm/cancel seats accordingly
 	// 4. Publish appropriate events
-
-	fmt.Printf("Received payment notification: %+v", notification)
+	logger.WithContext(ctx).Info("Received payment notification",
+		"payment_id", notification.PaymentID,
+		"status", notification.Status)
 
 	switch notification.Status {
 	case "completed", "CONFIRMED":
@@ -266,7 +279,10 @@ func (s *BookingService) HandlePaymentNotification(ctx context.Context, notifica
 			Timestamp: time.Now(),
 		}
 		if err := s.natsClient.Publish(models.EventPaymentCompleted, event); err != nil {
-			fmt.Printf("Failed to publish payment completed event: %v", err)
+			logger.WithContext(ctx).Error("Failed to publish payment completed event",
+				"error", err,
+				"payment_id", notification.PaymentID,
+				"event_type", "payment.completed")
 		}
 
 	case "failed", "REJECTED", "CANCELLED":
@@ -277,7 +293,10 @@ func (s *BookingService) HandlePaymentNotification(ctx context.Context, notifica
 			Timestamp: time.Now(),
 		}
 		if err := s.natsClient.Publish(models.EventPaymentFailed, event); err != nil {
-			fmt.Printf("Failed to publish payment failed event: %v", err)
+			logger.WithContext(ctx).Error("Failed to publish payment failed event",
+				"error", err,
+				"payment_id", notification.PaymentID,
+				"event_type", "payment.failed")
 		}
 	}
 

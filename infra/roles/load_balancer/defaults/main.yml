@@ -7,7 +7,7 @@ ssl_staging: false
 # Backend servers will be auto-discovered from api_servers ansible group
 
 # Nginx performance settings
-worker_processes: "auto"
+worker_processes: 16
 worker_connections: 65535
 client_max_body_size: "100M"
 

@@ -2,7 +2,7 @@ package api
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 
 	"bulbul/internal/cache"
@@ -10,12 +10,14 @@ import (
 	"bulbul/internal/database"
 	"bulbul/internal/external"
 	"bulbul/internal/handlers"
+	"bulbul/internal/logger"
 	"bulbul/internal/messaging"
 	"bulbul/internal/middleware"
 	"bulbul/internal/repository"
 	"bulbul/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // Server представляет HTTP сервер API
@@ -35,20 +37,23 @@ func NewServer(cfg *config.Config) *Server {
 	gin.SetMode(cfg.GinMode)
 
 	// Подключаемся к базе данных
+	slog.Info("Connecting to database", "host", cfg.Database.Host, "port", cfg.Database.Port)
 	db, err := database.Connect(cfg.Database)
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		logger.Fatal("Failed to connect to database", "error", err, "host", cfg.Database.Host)
 	}
 
 	// Запускаем миграции
+	slog.Info("Running database migrations")
 	if err := db.RunMigrations(); err != nil {
-		log.Fatalf("Failed to run migrations: %v", err)
+		logger.Fatal("Failed to run migrations", "error", err)
 	}
 
 	// Подключаемся к NATS
+	slog.Info("Connecting to NATS", "url", cfg.NATS.URL)
 	natsClient, err := messaging.NewNATSClient(cfg.NATS)
 	if err != nil {
-		log.Fatalf("Failed to connect to NATS: %v", err)
+		logger.Fatal("Failed to connect to NATS", "error", err, "url", cfg.NATS.URL)
 	}
 
 	// Создаем клиенты внешних сервисов
@@ -62,11 +67,14 @@ func NewServer(cfg *config.Config) *Server {
 	services := service.NewServices(repos, natsClient, ticketingClient, paymentClient)
 
 	// Создаем Valkey клиент (может быть nil если не удалось подключиться)
+	slog.Info("Connecting to Valkey cache")
 	var valkeyClient *cache.ValkeyClient
 	valkeyClient, err = cache.NewValkeyClient()
 	if err != nil {
-		log.Printf("Warning: Failed to connect to Valkey, falling back to database auth: %v", err)
+		slog.Warn("Failed to connect to Valkey, falling back to database auth", "error", err)
 		valkeyClient = nil
+	} else {
+		slog.Info("Successfully connected to Valkey cache")
 	}
 
 	// Создаем роутер
@@ -136,9 +144,10 @@ func (s *Server) setupRoutes() {
 		}
 	}
 
-	// Health check endpoints
+	// Health check and monitoring endpoints
 	s.router.GET("/health", s.healthCheck)
 	s.router.GET("/health/db", s.dbHealthCheck)
+	s.router.GET("/metrics", gin.WrapH(promhttp.Handler()))
 }
 
 // healthCheck обрабатывает health check запросы
@@ -178,16 +187,22 @@ func (s *Server) GetRouter() *gin.Engine {
 
 // Cleanup закрывает соединения
 func (s *Server) Cleanup() error {
+	slog.Info("Cleaning up server connections")
+	
 	if s.nats != nil {
 		if err := s.nats.Close(); err != nil {
-			log.Printf("Error closing NATS connection: %v", err)
+			slog.Error("Error closing NATS connection", "error", err)
+		} else {
+			slog.Info("NATS connection closed successfully")
 		}
 	}
 
 	if s.db != nil {
 		if err := s.db.Close(); err != nil {
-			log.Printf("Error closing database connection: %v", err)
+			slog.Error("Error closing database connection", "error", err)
 			return err
+		} else {
+			slog.Info("Database connection closed successfully")
 		}
 	}
 

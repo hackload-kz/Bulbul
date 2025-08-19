@@ -59,3 +59,15 @@ scrape_configs:
     scrape_interval: {{ scrape_interval }}
     metrics_path: /metrics
 {% endif %}
+
+  # Bulbul Application metrics
+{% if api_server_hosts %}
+  - job_name: 'bulbul_app'
+    static_configs:
+      - targets:
+{% for host in api_server_hosts %}
+        - '{{ hostvars[host]["ansible_host"] }}:{{ api_server_port }}'
+{% endfor %}
+    scrape_interval: {{ scrape_interval }}
+    metrics_path: /metrics
+{% endif %}

@@ -4,10 +4,12 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
 	"bulbul/internal/cache"
+	"bulbul/internal/logger"
 	"bulbul/internal/models"
 	"bulbul/internal/repository"
 
@@ -50,21 +52,47 @@ func CORS() gin.HandlerFunc {
 	}
 }
 
-// Logger middleware для логирования запросов
+// Logger middleware для структурированного логирования запросов
 func Logger() gin.HandlerFunc {
-	return gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
-		return fmt.Sprintf("%s - [%s] \"%s %s %s %d %s \"%s\" %s\"\n",
-			param.ClientIP,
-			param.TimeStamp.Format(time.RFC1123),
-			param.Method,
-			param.Path,
-			param.Request.Proto,
-			param.StatusCode,
-			param.Latency,
-			param.Request.UserAgent(),
-			param.ErrorMessage,
-		)
-	})
+	return func(c *gin.Context) {
+		// Генерируем request ID
+		requestID := logger.NewRequestID()
+		c.Set("request_id", requestID)
+		c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), "request_id", requestID))
+
+		// Записываем время начала
+		start := time.Now()
+
+		// Выполняем запрос
+		c.Next()
+
+		// Логируем результат
+		latency := time.Since(start)
+		userID, exists := c.Get("user_id")
+
+		logFields := []any{
+			"request_id", requestID,
+			"method", c.Request.Method,
+			"path", c.Request.URL.Path,
+			"status_code", c.Writer.Status(),
+			"latency_ms", latency.Milliseconds(),
+			"client_ip", c.ClientIP(),
+			"user_agent", c.Request.UserAgent(),
+		}
+
+		if exists {
+			logFields = append(logFields, "user_id", userID)
+		}
+
+		if c.Writer.Status() >= 400 {
+			if len(c.Errors) > 0 {
+				logFields = append(logFields, "error", c.Errors.String())
+			}
+			slog.Error("Request completed with error", logFields...)
+		} else {
+			slog.Info("Request completed", logFields...)
+		}
+	}
 }
 
 // Recovery middleware для восстановления после паники

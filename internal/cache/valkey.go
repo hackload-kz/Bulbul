@@ -114,3 +114,19 @@ func (v *ValkeyClient) GetEventsList(ctx context.Context, page, pageSize int, re
 	
 	return nil
 }
+
+// GetEventsListRaw returns raw JSON bytes from cache without unmarshaling
+// This avoids the overhead of JSON unmarshaling when serving cached responses directly
+func (v *ValkeyClient) GetEventsListRaw(ctx context.Context, page, pageSize int) ([]byte, error) {
+	cacheKey := v.generateEventsListCacheKey(page, pageSize)
+	
+	cachedData, err := v.client.Get(ctx, cacheKey).Result()
+	if err != nil {
+		if err == redis.Nil {
+			return nil, fmt.Errorf("cache miss")
+		}
+		return nil, fmt.Errorf("cache lookup error: %w", err)
+	}
+	
+	return []byte(cachedData), nil
+}

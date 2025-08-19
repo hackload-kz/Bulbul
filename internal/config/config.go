@@ -12,10 +12,15 @@ import (
 
 // Config содержит конфигурацию приложения
 type Config struct {
-	Port      string
-	GinMode   string
-	LogLevel  string
-	LogFormat string
+	Port           string
+	GinMode        string
+	LogLevel       string
+	LogFormat      string
+	RequestTimeout time.Duration
+	
+	// Performance monitoring
+	PprofEnabled bool
+	PprofPort    string
 
 	Database  database.Config
 	NATS      messaging.Config
@@ -26,10 +31,15 @@ type Config struct {
 // Load загружает конфигурацию из переменных окружения
 func Load() *Config {
 	return &Config{
-		Port:      getEnv("PORT", "8081"),
-		GinMode:   getEnv("GIN_MODE", "debug"),
-		LogLevel:  getEnv("LOG_LEVEL", "info"),
-		LogFormat: getEnv("LOG_FORMAT", "json"),
+		Port:           getEnv("PORT", "8081"),
+		GinMode:        getEnv("GIN_MODE", "debug"),
+		LogLevel:       getEnv("LOG_LEVEL", "info"),
+		LogFormat:      getEnv("LOG_FORMAT", "json"),
+		RequestTimeout: time.Duration(getEnvInt("REQUEST_TIMEOUT_SEC", 30)) * time.Second,
+		
+		// Performance monitoring
+		PprofEnabled: getEnv("PPROF_ENABLED", "false") == "true",
+		PprofPort:    getEnv("PPROF_PORT", "6060"),
 
 		Database: database.Config{
 			Host:               getEnv("DB_HOST", "localhost"),
@@ -38,8 +48,8 @@ func Load() *Config {
 			Password:           getEnv("DB_PASSWORD", "bulbul123"),
 			DBName:             getEnv("DB_NAME", "bulbul"),
 			SSLMode:            getEnv("DB_SSLMODE", "disable"),
-			MaxOpenConns:       getEnvInt("DB_MAX_OPEN_CONNS", 25),
-			MaxIdleConns:       getEnvInt("DB_MAX_IDLE_CONNS", 10),
+			MaxOpenConns:       getEnvInt("DB_MAX_OPEN_CONNS", 100),
+			MaxIdleConns:       getEnvInt("DB_MAX_IDLE_CONNS", 25),
 			ConnMaxLifetimeMin: getEnvInt("DB_CONN_MAX_LIFETIME_MIN", 5),
 			ConnMaxIdleTimeMin: getEnvInt("DB_CONN_MAX_IDLE_TIME_MIN", 1),
 		},

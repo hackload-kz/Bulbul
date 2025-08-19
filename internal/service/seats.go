@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"bulbul/internal/external"
+	"bulbul/internal/logger"
 	"bulbul/internal/messaging"
 	"bulbul/internal/models"
 	"bulbul/internal/repository"
@@ -139,7 +140,11 @@ func (s *SeatService) Select(ctx context.Context, req *models.SelectSeatRequest)
 
 	if err := s.natsClient.Publish(models.EventSeatSelected, event); err != nil {
 		// Log error but don't fail the operation
-		fmt.Printf("Failed to publish seat selected event: %v", err)
+		logger.WithContext(ctx).Error("Failed to publish seat selected event", 
+			"error", err, 
+			"seat_id", req.SeatID, 
+			"booking_id", req.BookingID,
+			"event_type", "seat.selected")
 	}
 
 	return nil
@@ -180,7 +185,11 @@ func (s *SeatService) selectExternalSeat(ctx context.Context, req *models.Select
 
 	if err := s.natsClient.Publish(models.EventSeatSelected, event); err != nil {
 		// Log error but don't fail the operation
-		fmt.Printf("Failed to publish seat selected event: %v", err)
+		logger.WithContext(ctx).Error("Failed to publish seat selected event for external seat", 
+			"error", err, 
+			"seat_id", req.SeatID, 
+			"booking_id", req.BookingID,
+			"event_type", "seat.selected")
 	}
 
 	return nil
@@ -216,7 +225,11 @@ func (s *SeatService) Release(ctx context.Context, req *models.ReleaseSeatReques
 
 	if err := s.natsClient.Publish(models.EventSeatReleased, event); err != nil {
 		// Log error but don't fail the operation
-		fmt.Printf("Failed to publish seat released event: %v", err)
+		logger.WithContext(ctx).Error("Failed to publish seat released event", 
+			"error", err, 
+			"seat_id", req.SeatID, 
+			"event_id", seat.EventID,
+			"event_type", "seat.released")
 	}
 
 	return nil
@@ -253,7 +266,10 @@ func (s *SeatService) releaseExternalSeat(ctx context.Context, req *models.Relea
 
 	if err := s.natsClient.Publish(models.EventSeatReleased, event); err != nil {
 		// Log error but don't fail the operation
-		fmt.Printf("Failed to publish seat released event: %v", err)
+		logger.WithContext(ctx).Error("Failed to publish seat released event for external seat", 
+			"error", err, 
+			"seat_id", req.SeatID, 
+			"event_type", "seat.released")
 	}
 
 	return nil

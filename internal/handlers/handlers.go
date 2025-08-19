@@ -74,12 +74,12 @@ func (h *Handlers) ListEvents(c *gin.Context) {
 	
 	// Try to get from cache if conditions are met and cache client is available
 	if shouldCache && h.valkeyClient != nil {
-		var cachedResponse []models.ListEventsResponseItem
-		err := h.valkeyClient.GetEventsList(c.Request.Context(), page, pageSize, &cachedResponse)
+		// Use raw JSON to avoid unmarshaling/marshaling overhead
+		rawJSON, err := h.valkeyClient.GetEventsListRaw(c.Request.Context(), page, pageSize)
 		if err == nil {
-			// Cache hit - return cached data
+			// Cache hit - return raw JSON data directly
 			log.Printf("Cache hit for events list: page=%d, pageSize=%d", page, pageSize)
-			c.JSON(http.StatusOK, cachedResponse)
+			c.Data(http.StatusOK, "application/json", rawJSON)
 			return
 		}
 		// Cache miss or error - continue to fetch from database

@@ -15,7 +15,7 @@
   
   roles:
     - node_exporter
-  tags: monitoring
+  tags: node_exporter
 
 - name: Provision Load Balancer
   hosts: load_balancer

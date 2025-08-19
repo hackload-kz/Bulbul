@@ -2,8 +2,9 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
@@ -11,6 +12,7 @@ import (
 
 	"bulbul/internal/api"
 	"bulbul/internal/config"
+	"bulbul/internal/logger"
 	"bulbul/internal/validation"
 )
 
@@ -24,20 +26,45 @@ func main() {
 	// Загружаем конфигурацию
 	cfg := config.Load()
 
+	// Инициализируем логгер
+	logger.Init(cfg.LogLevel, cfg.LogFormat)
+
+	slog.Info("Application starting", 
+		"log_level", cfg.LogLevel,
+		"log_format", cfg.LogFormat,
+		"gin_mode", cfg.GinMode)
+
 	// Создаем и настраиваем сервер
 	server := api.NewServer(cfg)
 
+	// Запускаем pprof сервер если включен
+	if cfg.PprofEnabled {
+		go func() {
+			slog.Info("Starting pprof server", "port", cfg.PprofPort)
+			pprofServer := &http.Server{
+				Addr:    ":" + cfg.PprofPort,
+				Handler: http.DefaultServeMux, // pprof handlers are registered here
+			}
+			if err := pprofServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				slog.Error("pprof server failed", "error", err)
+			}
+		}()
+	}
+
 	// Создаем HTTP сервер
 	srv := &http.Server{
-		Addr:    ":" + cfg.Port,
-		Handler: server.GetRouter(),
+		Addr:         ":" + cfg.Port,
+		Handler:      server.GetRouter(),
+		ReadTimeout:  cfg.RequestTimeout,
+		WriteTimeout: cfg.RequestTimeout,
+		IdleTimeout:  time.Minute,
 	}
 
 	// Запускаем сервер в отдельной горутине
 	go func() {
-		log.Printf("Starting server on :%s", cfg.Port)
+		slog.Info("Starting HTTP server", "port", cfg.Port)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Failed to start server: %v", err)
+			logger.Fatal("Failed to start server", "error", err)
 		}
 	}()
 
@@ -46,20 +73,20 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	log.Println("Shutting down server...")
+	slog.Info("Shutting down server...")
 
 	// Graceful shutdown с таймаутом
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	if err := srv.Shutdown(ctx); err != nil {
-		log.Printf("Server forced to shutdown: %v", err)
+		slog.Error("Server forced to shutdown", "error", err)
 	}
 
 	// Закрываем соединения
 	if err := server.Cleanup(); err != nil {
-		log.Printf("Error during cleanup: %v", err)
+		slog.Error("Error during cleanup", "error", err)
 	}
 
-	log.Println("Server stopped")
+	slog.Info("Server stopped gracefully")
 }
