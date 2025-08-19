@@ -16,7 +16,7 @@ resource "openstack_networking_port_v2" "api_server_port" {
 resource "openstack_compute_instance_v2" "api_server" {
   count                = var.vms_enabled ? var.api_server_count : 0
   name        = "api-server-${count.index}"
-  flavor_name = "d1.ram2cpu1"
+  flavor_name = "d1.ram4cpu4"
   key_pair    = openstack_compute_keypair_v2.ssh.name
 
   user_data = file("${path.module}/resources/cloud-init.yml")

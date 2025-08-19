@@ -9,12 +9,14 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/redis/go-redis/v9"
+	"github.com/redis/rueidis"
 )
 
 type ValkeyClient struct {
-	client      *redis.Client
-	usersHashKey string
+	client         rueidis.Client
+	usersHashKey   string
+	authCacheTTL   time.Duration
+	eventsCacheTTL time.Duration
 }
 
 func NewValkeyClient() (*ValkeyClient, error) {
@@ -29,35 +31,75 @@ func NewValkeyClient() (*ValkeyClient, error) {
 		usersHashKey = "users:auth"
 	}
 
-	rdb := redis.NewClient(&redis.Options{
-		Addr:         addr,
-		Password:     password,
-		DB:           0,
-		ReadTimeout:  2 * time.Second,
-		WriteTimeout: 2 * time.Second,
-		DialTimeout:  5 * time.Second,
-	})
+	// Parse cache TTL configurations
+	authCacheTTL := getEnvDuration("VALKEY_AUTH_CACHE_TTL_MIN", 10*time.Minute)
+	eventsCacheTTL := getEnvDuration("VALKEY_EVENTS_CACHE_TTL_MIN", 5*time.Minute)
 
+	// Parse cache size in MB
+	cacheSizeMB := getEnvInt("VALKEY_CLIENT_CACHE_SIZE_MB", 128)
+	cacheSizeBytes := int64(cacheSizeMB) * (1 << 20) // Convert MB to bytes
+
+	// Create rueidis client with optimized settings
+	client, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress: []string{addr},
+		Password:    password,
+		SelectDB:    0,
+		// Client-side caching configuration
+		CacheSizeEachConn: int(cacheSizeBytes),
+		// DisableCache: false, // Enable client-side caching (default)
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create rueidis client: %w", err)
+	}
+
+	// Test connection with ping
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	if err := rdb.Ping(ctx).Err(); err != nil {
+	if err := client.Do(ctx, client.B().Ping().Build()).Error(); err != nil {
 		return nil, fmt.Errorf("failed to connect to Valkey: %w", err)
 	}
 
 	return &ValkeyClient{
-		client:       rdb,
-		usersHashKey: usersHashKey,
+		client:         client,
+		usersHashKey:   usersHashKey,
+		authCacheTTL:   authCacheTTL,
+		eventsCacheTTL: eventsCacheTTL,
 	}, nil
+}
+
+// Helper functions for parsing environment variables
+func getEnvInt(key string, defaultValue int) int {
+	if value := os.Getenv(key); value != "" {
+		if intValue, err := strconv.Atoi(value); err == nil {
+			return intValue
+		}
+	}
+	return defaultValue
+}
+
+func getEnvDuration(key string, defaultValue time.Duration) time.Duration {
+	if value := os.Getenv(key); value != "" {
+		if intValue, err := strconv.Atoi(value); err == nil {
+			return time.Duration(intValue) * time.Minute
+		}
+	}
+	return defaultValue
 }
 
 func (v *ValkeyClient) GetUserIDByAuth(ctx context.Context, email, passwordHash string) (int64, error) {
 	authString := fmt.Sprintf("%s:%s", email, passwordHash)
 	cacheKey := base64.StdEncoding.EncodeToString([]byte(authString))
 
-	userIDStr, err := v.client.HGet(ctx, v.usersHashKey, cacheKey).Result()
+	// Use client-side caching for auth lookups (they rarely change)
+	result := v.client.DoCache(ctx,
+		v.client.B().Hget().Key(v.usersHashKey).Field(cacheKey).Cache(),
+		v.authCacheTTL,
+	)
+
+	userIDStr, err := result.ToString()
 	if err != nil {
-		if err == redis.Nil {
+		if rueidis.IsRedisNil(err) {
 			return 0, fmt.Errorf("user not found in cache")
 		}
 		return 0, fmt.Errorf("cache lookup error: %w", err)
@@ -72,7 +114,8 @@ func (v *ValkeyClient) GetUserIDByAuth(ctx context.Context, email, passwordHash 
 }
 
 func (v *ValkeyClient) Close() error {
-	return v.client.Close()
+	v.client.Close()
+	return nil
 }
 
 func (v *ValkeyClient) generateEventsListCacheKey(page, pageSize int) string {
@@ -87,8 +130,12 @@ func (v *ValkeyClient) SetEventsList(ctx context.Context, page, pageSize int, ev
 		return fmt.Errorf("failed to marshal events data: %w", err)
 	}
 	
-	ttl := 5 * time.Minute
-	err = v.client.Set(ctx, cacheKey, eventData, ttl).Err()
+	// Use regular Do() for SET operations (not cacheable)
+	serverTTL := v.eventsCacheTTL
+	err = v.client.Do(ctx,
+		v.client.B().Set().Key(cacheKey).Value(string(eventData)).Ex(serverTTL).Build(),
+	).Error()
+	
 	if err != nil {
 		return fmt.Errorf("failed to set events cache: %w", err)
 	}
@@ -99,9 +146,15 @@ func (v *ValkeyClient) SetEventsList(ctx context.Context, page, pageSize int, ev
 func (v *ValkeyClient) GetEventsList(ctx context.Context, page, pageSize int, result interface{}) error {
 	cacheKey := v.generateEventsListCacheKey(page, pageSize)
 	
-	cachedData, err := v.client.Get(ctx, cacheKey).Result()
+	// Use client-side caching for GET operations
+	resp := v.client.DoCache(ctx,
+		v.client.B().Get().Key(cacheKey).Cache(),
+		v.eventsCacheTTL,
+	)
+	
+	cachedData, err := resp.ToString()
 	if err != nil {
-		if err == redis.Nil {
+		if rueidis.IsRedisNil(err) {
 			return fmt.Errorf("cache miss")
 		}
 		return fmt.Errorf("cache lookup error: %w", err)
@@ -117,12 +170,23 @@ func (v *ValkeyClient) GetEventsList(ctx context.Context, page, pageSize int, re
 
 // GetEventsListRaw returns raw JSON bytes from cache without unmarshaling
 // This avoids the overhead of JSON unmarshaling when serving cached responses directly
+// Uses client-side caching for maximum performance
 func (v *ValkeyClient) GetEventsListRaw(ctx context.Context, page, pageSize int) ([]byte, error) {
 	cacheKey := v.generateEventsListCacheKey(page, pageSize)
 	
-	cachedData, err := v.client.Get(ctx, cacheKey).Result()
+	// Use client-side caching with raw bytes for maximum performance
+	resp := v.client.DoCache(ctx,
+		v.client.B().Get().Key(cacheKey).Cache(),
+		v.eventsCacheTTL,
+	)
+	
+	if resp.IsCacheHit() {
+		// Ultra-fast path: served directly from client-side memory
+	}
+	
+	cachedData, err := resp.ToString()
 	if err != nil {
-		if err == redis.Nil {
+		if rueidis.IsRedisNil(err) {
 			return nil, fmt.Errorf("cache miss")
 		}
 		return nil, fmt.Errorf("cache lookup error: %w", err)

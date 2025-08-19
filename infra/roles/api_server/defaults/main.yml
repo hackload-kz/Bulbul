@@ -35,6 +35,9 @@ db_max_open_conns: 100
 valkey_host: "{{ hostvars[groups['valkey'][0]]['ansible_host'] }}"
 valkey_port: "6379"
 valkey_password: ""
+valkey_client_cache_size_mb: 128
+valkey_auth_cache_ttl_min: 10
+valkey_events_cache_ttl_min: 5
 
 # NATS configuration
 nats_url: "nats://{{ hostvars[groups['nats'][0]]['ansible_host'] }}:4222"
