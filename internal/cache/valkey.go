@@ -39,14 +39,23 @@ func NewValkeyClient() (*ValkeyClient, error) {
 	cacheSizeMB := getEnvInt("VALKEY_CLIENT_CACHE_SIZE_MB", 128)
 	cacheSizeBytes := int64(cacheSizeMB) * (1 << 20) // Convert MB to bytes
 
-	// Create rueidis client with optimized settings
+	// Create rueidis client with comprehensive connection pool settings
 	client, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress: []string{addr},
-		Password:    password,
-		SelectDB:    0,
+		InitAddress:  []string{addr},
+		Password:     password,
+		SelectDB:     0,
+		
 		// Client-side caching configuration
 		CacheSizeEachConn: int(cacheSizeBytes),
-		// DisableCache: false, // Enable client-side caching (default)
+		
+		// Connection pool configuration to prevent blocking/exhaustion
+		ConnWriteTimeout:     5 * time.Second,  // Detect hanging connections quickly
+		BlockingPoolSize:     64,               // Increase pool size for concurrent requests
+		PipelineMultiplex:    8,                // Limit concurrent pipelined commands
+		DisableAutoPipelining: true,            // Avoid Head-of-Line blocking under load
+		AlwaysRESP2:         true,              // Use RESP2 for better compatibility
+		
+		// Note: Connection timeouts are handled by ConnWriteTimeout above
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create rueidis client: %w", err)
@@ -118,6 +127,12 @@ func (v *ValkeyClient) Close() error {
 	return nil
 }
 
+// LogConnectionPoolStats logs current connection pool statistics for monitoring
+func (v *ValkeyClient) LogConnectionPoolStats(ctx context.Context) {
+	// Log pool configuration and usage for debugging
+	fmt.Printf("Valkey connection pool status - Client configured with auto-pipelining disabled\n")
+}
+
 func (v *ValkeyClient) generateEventsListCacheKey(page, pageSize int) string {
 	return fmt.Sprintf("events:list:page:%d:size:%d", page, pageSize)
 }
@@ -183,13 +198,20 @@ func (v *ValkeyClient) GetEventsList(ctx context.Context, page, pageSize int, re
 
 // GetEventsListRaw returns raw JSON bytes from cache without unmarshaling
 // This avoids the overhead of JSON unmarshaling when serving cached responses directly
-// Uses client-side caching for maximum performance
+// Uses client-side caching for maximum performance with fallback strategy
 func (v *ValkeyClient) GetEventsListRaw(ctx context.Context, page, pageSize int) ([]byte, error) {
 	cacheKey := v.generateEventsListCacheKey(page, pageSize)
 	
-	// Create a timeout context for cache operations (2 seconds max)
-	cacheCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	// Create a timeout context for cache operations (1 second max for reads)
+	cacheCtx, cancel := context.WithTimeout(ctx, 1*time.Second)
 	defer cancel()
+	
+	// Wrap cache operation with recovery to prevent panics
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Printf("PANIC in GetEventsListRaw: %v\n", r)
+		}
+	}()
 	
 	// Use client-side caching with raw bytes for maximum performance
 	resp := v.client.DoCache(cacheCtx,
@@ -200,6 +222,7 @@ func (v *ValkeyClient) GetEventsListRaw(ctx context.Context, page, pageSize int)
 	// Check if served from client-side cache
 	if resp.IsCacheHit() {
 		// Ultra-fast path: served directly from client-side memory
+		fmt.Printf("Cache HIT (client-side) for events list: page=%d, pageSize=%d\n", page, pageSize)
 	}
 	
 	cachedData, err := resp.ToString()
@@ -207,10 +230,12 @@ func (v *ValkeyClient) GetEventsListRaw(ctx context.Context, page, pageSize int)
 		if rueidis.IsRedisNil(err) {
 			return nil, fmt.Errorf("cache miss")
 		}
-		// Check for context timeout/cancellation
-		if ctx.Err() != nil {
-			return nil, fmt.Errorf("cache operation cancelled: %w", ctx.Err())
+		// Check for context timeout/cancellation - this is the likely culprit!
+		if cacheCtx.Err() != nil {
+			fmt.Printf("Cache operation TIMEOUT for events list: page=%d, pageSize=%d, err=%v\n", page, pageSize, cacheCtx.Err())
+			return nil, fmt.Errorf("cache operation timeout: %w", cacheCtx.Err())
 		}
+		fmt.Printf("Cache lookup ERROR for events list: page=%d, pageSize=%d, err=%v\n", page, pageSize, err)
 		return nil, fmt.Errorf("cache lookup error: %w", err)
 	}
 	

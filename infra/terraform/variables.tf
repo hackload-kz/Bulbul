@@ -1,5 +1,5 @@
 variable "vms_enabled" {
-  default = true
+  default = false
 }
 
 variable "api_server_count" {
