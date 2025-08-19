@@ -3,6 +3,7 @@ package cache
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
@@ -72,4 +73,44 @@ func (v *ValkeyClient) GetUserIDByAuth(ctx context.Context, email, passwordHash 
 
 func (v *ValkeyClient) Close() error {
 	return v.client.Close()
+}
+
+func (v *ValkeyClient) generateEventsListCacheKey(page, pageSize int) string {
+	return fmt.Sprintf("events:list:page:%d:size:%d", page, pageSize)
+}
+
+func (v *ValkeyClient) SetEventsList(ctx context.Context, page, pageSize int, events interface{}) error {
+	cacheKey := v.generateEventsListCacheKey(page, pageSize)
+	
+	eventData, err := json.Marshal(events)
+	if err != nil {
+		return fmt.Errorf("failed to marshal events data: %w", err)
+	}
+	
+	ttl := 5 * time.Minute
+	err = v.client.Set(ctx, cacheKey, eventData, ttl).Err()
+	if err != nil {
+		return fmt.Errorf("failed to set events cache: %w", err)
+	}
+	
+	return nil
+}
+
+func (v *ValkeyClient) GetEventsList(ctx context.Context, page, pageSize int, result interface{}) error {
+	cacheKey := v.generateEventsListCacheKey(page, pageSize)
+	
+	cachedData, err := v.client.Get(ctx, cacheKey).Result()
+	if err != nil {
+		if err == redis.Nil {
+			return fmt.Errorf("cache miss")
+		}
+		return fmt.Errorf("cache lookup error: %w", err)
+	}
+	
+	err = json.Unmarshal([]byte(cachedData), result)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal cached events data: %w", err)
+	}
+	
+	return nil
 }

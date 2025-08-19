@@ -39,14 +39,6 @@ server {
     ssl_session_cache shared:SSL:10m;
     ssl_session_timeout 10m;
 
-    # OCSP stapling (disabled to prevent warnings with staging certificates)
-    # Uncomment the lines below if using production certificates with OCSP responder URL
-    # ssl_stapling on;
-    # ssl_stapling_verify on;
-
-    # Rate limiting
-    limit_req zone=api burst=20 nodelay;
-
     # Proxy configuration
     location / {
         proxy_pass http://backend;

@@ -8,7 +8,7 @@ postgresql_database: "bulbul"
 # Connection settings
 postgresql_port: 5432
 postgresql_listen_addresses: "0.0.0.0"
-postgresql_max_connections: 200
+postgresql_max_connections: 2000
 
 # Memory settings (adjust based on available RAM)
 postgresql_shared_buffers: "256MB"

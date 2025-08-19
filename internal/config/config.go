@@ -32,12 +32,16 @@ func Load() *Config {
 		LogFormat: getEnv("LOG_FORMAT", "json"),
 
 		Database: database.Config{
-			Host:     getEnv("DB_HOST", "localhost"),
-			Port:     getEnvInt("DB_PORT", 5432),
-			User:     getEnv("DB_USER", "bulbul"),
-			Password: getEnv("DB_PASSWORD", "bulbul123"),
-			DBName:   getEnv("DB_NAME", "bulbul"),
-			SSLMode:  getEnv("DB_SSLMODE", "disable"),
+			Host:               getEnv("DB_HOST", "localhost"),
+			Port:               getEnvInt("DB_PORT", 5432),
+			User:               getEnv("DB_USER", "bulbul"),
+			Password:           getEnv("DB_PASSWORD", "bulbul123"),
+			DBName:             getEnv("DB_NAME", "bulbul"),
+			SSLMode:            getEnv("DB_SSLMODE", "disable"),
+			MaxOpenConns:       getEnvInt("DB_MAX_OPEN_CONNS", 25),
+			MaxIdleConns:       getEnvInt("DB_MAX_IDLE_CONNS", 10),
+			ConnMaxLifetimeMin: getEnvInt("DB_CONN_MAX_LIFETIME_MIN", 5),
+			ConnMaxIdleTimeMin: getEnvInt("DB_CONN_MAX_IDLE_TIME_MIN", 1),
 		},
 
 		NATS: messaging.Config{

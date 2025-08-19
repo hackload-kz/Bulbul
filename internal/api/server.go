@@ -95,8 +95,8 @@ func NewServer(cfg *config.Config) *Server {
 
 // setupRoutes настраивает все API роуты
 func (s *Server) setupRoutes() {
-	// Create handlers with services
-	h := handlers.NewHandlers(s.services)
+	// Create handlers with services and cache
+	h := handlers.NewHandlers(s.services, s.valkeyClient)
 
 	// API routes
 	api := s.router.Group("/api")
@@ -136,8 +136,9 @@ func (s *Server) setupRoutes() {
 		}
 	}
 
-	// Health check endpoint
+	// Health check endpoints
 	s.router.GET("/health", s.healthCheck)
+	s.router.GET("/health/db", s.dbHealthCheck)
 }
 
 // healthCheck обрабатывает health check запросы
@@ -147,6 +148,21 @@ func (s *Server) healthCheck(c *gin.Context) {
 		"service": "bulbul-api",
 		"version": "1.0.0",
 	})
+}
+
+// dbHealthCheck обрабатывает database health check запросы
+func (s *Server) dbHealthCheck(c *gin.Context) {
+	healthCheck := s.db.HealthCheck(c.Request.Context())
+	
+	status := http.StatusOK
+	if healthCheck.Status != "healthy" {
+		status = http.StatusServiceUnavailable
+	}
+	
+	// Validate connection pool and add warnings if needed
+	s.db.ValidateConnectionPool()
+	
+	c.JSON(status, healthCheck)
 }
 
 // Run запускает HTTP сервер

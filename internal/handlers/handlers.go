@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"bulbul/internal/cache"
 	"bulbul/internal/models"
 	"bulbul/internal/service"
 
@@ -12,11 +13,15 @@ import (
 )
 
 type Handlers struct {
-	services *service.Services
+	services     *service.Services
+	valkeyClient *cache.ValkeyClient
 }
 
-func NewHandlers(services *service.Services) *Handlers {
-	return &Handlers{services: services}
+func NewHandlers(services *service.Services, valkeyClient *cache.ValkeyClient) *Handlers {
+	return &Handlers{
+		services:     services,
+		valkeyClient: valkeyClient,
+	}
 }
 
 // Events handlers
@@ -51,7 +56,7 @@ func (h *Handlers) ListEvents(c *gin.Context) {
 
 	// Get pagination parameters
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "10"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "20"))
 
 	// Validate pagination parameters
 	if page < 1 {
@@ -64,6 +69,24 @@ func (h *Handlers) ListEvents(c *gin.Context) {
 		return
 	}
 
+	// Check if we should use caching
+	shouldCache := h.shouldCacheEventsRequest(query, date, pageSize)
+	
+	// Try to get from cache if conditions are met and cache client is available
+	if shouldCache && h.valkeyClient != nil {
+		var cachedResponse []models.ListEventsResponseItem
+		err := h.valkeyClient.GetEventsList(c.Request.Context(), page, pageSize, &cachedResponse)
+		if err == nil {
+			// Cache hit - return cached data
+			log.Printf("Cache hit for events list: page=%d, pageSize=%d", page, pageSize)
+			c.JSON(http.StatusOK, cachedResponse)
+			return
+		}
+		// Cache miss or error - continue to fetch from database
+		log.Printf("Cache miss for events list: page=%d, pageSize=%d, err=%v", page, pageSize, err)
+	}
+
+	// Fetch from database
 	response, err := h.services.Events.List(c.Request.Context(), query, date, page, pageSize)
 	if err != nil {
 		log.Printf("Failed to list events: %v", err)
@@ -71,7 +94,29 @@ func (h *Handlers) ListEvents(c *gin.Context) {
 		return
 	}
 
+	// Store in cache if conditions are met and cache client is available
+	if shouldCache && h.valkeyClient != nil {
+		err := h.valkeyClient.SetEventsList(c.Request.Context(), page, pageSize, response)
+		if err != nil {
+			log.Printf("Failed to cache events list: %v", err)
+			// Continue without caching - don't fail the request
+		} else {
+			log.Printf("Cached events list: page=%d, pageSize=%d", page, pageSize)
+		}
+	}
+
 	c.JSON(http.StatusOK, response)
+}
+
+// shouldCacheEventsRequest determines if the request should be cached
+func (h *Handlers) shouldCacheEventsRequest(query, date string, pageSize int) bool {
+	// Don't cache if query or date parameters are provided
+	if query != "" || date != "" {
+		return false
+	}
+	
+	// Only cache if pageSize is divisible by 5
+	return pageSize%5 == 0
 }
 
 // Bookings handlers

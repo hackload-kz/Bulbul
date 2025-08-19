@@ -29,6 +29,7 @@ postgres_user: "postgres"
 postgres_password: "postgres_admin_123"
 postgres_database: "bulbul"
 postgres_sslmode: "disable"
+db_max_open_conns: 500
 
 # Cache configuration (Valkey)
 valkey_host: "{{ hostvars[groups['valkey'][0]]['ansible_host'] }}"
