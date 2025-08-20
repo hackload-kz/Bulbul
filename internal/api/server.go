@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"log"
 	"log/slog"
 	"net/http"
 
@@ -22,12 +23,12 @@ import (
 
 // Server представляет HTTP сервер API
 type Server struct {
-	router      *gin.Engine
-	config      *config.Config
-	db          *database.DB
-	nats        *messaging.NATSClient
-	services    *service.Services
-	repos       *repository.Repositories
+	router       *gin.Engine
+	config       *config.Config
+	db           *database.DB
+	nats         *messaging.NATSClient
+	services     *service.Services
+	repos        *repository.Repositories
 	valkeyClient *cache.ValkeyClient
 }
 
@@ -71,7 +72,7 @@ func NewServer(cfg *config.Config) *Server {
 	var valkeyClient *cache.ValkeyClient
 	valkeyClient, err = cache.NewValkeyClient()
 	if err != nil {
-		slog.Warn("Failed to connect to Valkey, falling back to database auth", "error", err)
+		log.Fatalf("Failed to connect to Valkey: %s", err)
 		valkeyClient = nil
 	} else {
 		slog.Info("Successfully connected to Valkey cache")
@@ -81,9 +82,9 @@ func NewServer(cfg *config.Config) *Server {
 	router := gin.New()
 
 	// Применяем middleware в правильном порядке
-	router.Use(middleware.Logger())     // Логирование запросов
-	router.Use(middleware.Recovery())   // Кастомное восстановление после паники
-	router.Use(middleware.CORS())       // CORS headers
+	router.Use(middleware.Logger())   // Логирование запросов
+	router.Use(middleware.Recovery()) // Кастомное восстановление после паники
+	// router.Use(middleware.CORS())     // CORS headers
 
 	// Создаем сервер
 	server := &Server{
@@ -163,15 +164,15 @@ func (s *Server) healthCheck(c *gin.Context) {
 // dbHealthCheck обрабатывает database health check запросы
 func (s *Server) dbHealthCheck(c *gin.Context) {
 	healthCheck := s.db.HealthCheck(c.Request.Context())
-	
+
 	status := http.StatusOK
 	if healthCheck.Status != "healthy" {
 		status = http.StatusServiceUnavailable
 	}
-	
+
 	// Validate connection pool and add warnings if needed
 	s.db.ValidateConnectionPool()
-	
+
 	c.JSON(status, healthCheck)
 }
 
@@ -189,7 +190,7 @@ func (s *Server) GetRouter() *gin.Engine {
 // Cleanup закрывает соединения
 func (s *Server) Cleanup() error {
 	slog.Info("Cleaning up server connections")
-	
+
 	if s.nats != nil {
 		if err := s.nats.Close(); err != nil {
 			slog.Error("Error closing NATS connection", "error", err)

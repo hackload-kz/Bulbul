@@ -54,7 +54,6 @@ func NewValkeyClient() (*ValkeyClient, error) {
 		BlockingPoolSize:      64,              // Increase pool size for concurrent requests
 		PipelineMultiplex:     8,               // Limit concurrent pipelined commands
 		DisableAutoPipelining: true,            // Avoid Head-of-Line blocking under load
-		AlwaysRESP2:           true,            // Use RESP2 for better compatibility
 
 		// Note: Connection timeouts are handled by ConnWriteTimeout above
 	})

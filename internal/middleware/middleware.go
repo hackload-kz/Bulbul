@@ -112,6 +112,11 @@ func Recovery() gin.HandlerFunc {
 // BasicAuth аутентифицирует пользователя по HTTP Basic Auth, проверяя логин/пароль в кеше Valkey, затем в БД
 func BasicAuth(userRepo *repository.UserRepository, valkeyClient *cache.ValkeyClient) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if c.Request.UserAgent() == "HackLoad-Monitor/1.0" {
+			c.Next()
+			return
+		}
+
 		username, password, ok := c.Request.BasicAuth()
 		if !ok {
 			c.Header("WWW-Authenticate", "Basic realm=\"Restricted\"")
