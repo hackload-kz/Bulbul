@@ -9,6 +9,11 @@ run = "go run cmd/api/main.go"
 [tasks.consumers]
 run = "go run cmd/consumers/main.go"
 
+[tasks.build_linux]
+run = [
+    "GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags='-w -s' -o './infra/files/api-server' ./cmd/api"
+]
+
 [tasks.load-data]
 run = [
     "psql -h localhost -p 5432 -U bulbul -d bulbul -f data/users.sql",

@@ -17,7 +17,7 @@ type Config struct {
 	LogLevel       string
 	LogFormat      string
 	RequestTimeout time.Duration
-	
+
 	// Performance monitoring
 	PprofEnabled bool
 	PprofPort    string
@@ -36,7 +36,7 @@ func Load() *Config {
 		LogLevel:       getEnv("LOG_LEVEL", "info"),
 		LogFormat:      getEnv("LOG_FORMAT", "json"),
 		RequestTimeout: time.Duration(getEnvInt("REQUEST_TIMEOUT_SEC", 30)) * time.Second,
-		
+
 		// Performance monitoring
 		PprofEnabled: getEnv("PPROF_ENABLED", "false") == "true",
 		PprofPort:    getEnv("PPROF_PORT", "6060"),

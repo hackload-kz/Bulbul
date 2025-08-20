@@ -27,7 +27,13 @@ request_timeout_sec: 300
 postgres_host: "{{ hostvars[groups['postgres'][0]]['ansible_host'] }}"
 postgres_port: "5432"
 postgres_user: "postgres"
-postgres_password: "postgres_admin_123"
+postgres_password: !vault |
+          $ANSIBLE_VAULT;1.1;AES256
+          30363361626530653630633433373231363864386439323730383136333538626131383632326434
+          6166643262313964653165356536336139623066636239300a343434373632313038336535373336
+          39663231396437373762663731316133363235383736343661333937363132396466383532636432
+          3365393864303164620a306161633939366133633334643665643335316561303466623438386636
+          36336432373236666336376339323134636564643032313232633433656533626134
 postgres_database: "bulbul"
 postgres_sslmode: "disable"
 db_max_open_conns: 100
@@ -52,12 +58,5 @@ payment_team_slug: "bulbul"
 payment_password: "hackload2025"
 service_timeout_sec: "30"
 
-# Source code repository
-api_server_repo_url: "https://github.com/hackload-kz/bulbul.git"
-api_server_repo_branch: "main"
-api_server_build_dir: "/tmp/bulbul-build"
-
 # Logging
 log_file: "/var/log/{{ api_server_service_name }}.log"
-log_max_size: "100MB"
-log_max_files: "5"

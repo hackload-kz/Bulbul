@@ -159,7 +159,6 @@ celerybeat.pid
 *.sage.py
 
 # Environments
-.env
 .envrc
 .venv
 env/
@@ -230,7 +229,6 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
-.os_password
 .terraform
 terraform.tfstate
 terraform.tfstate.backup
@@ -239,3 +237,5 @@ terraform.tfstate.backup
 data
 .claude
 infra/files/api-server
+.ansible-password
+.ansible_password
