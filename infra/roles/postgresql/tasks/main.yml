@@ -88,6 +88,7 @@
     encrypted: yes
     login_user: postgres
   become_user: postgres
+  ignore_errors: yes
 
 - name: Configure PostgreSQL authentication (secure - password auth for postgres)
   template:
@@ -149,6 +150,7 @@
   template:
     src: "tables.sql"
     dest: "{{ postgresql_data_dir }}/tables.sql"
+  when: postgresql_load_data
 
 - name: Create tables
   postgresql_db:
@@ -158,11 +160,13 @@
     login_user: postgres
     login_password: "{{ postgresql_postgres_password }}"
     login_host: localhost
+  when: postgresql_load_data
 
 - name: fulltext-index sql file
   template:
     src: "fulltext-index.sql"
     dest: "{{ postgresql_data_dir }}/fulltext-index.sql"
+  when: postgresql_load_data
 
 - name: Create fulltext-index
   postgresql_db:

@@ -13,9 +13,14 @@ packages:
 write_files:
   - path: /etc/sysctl.d/99-high-performance.conf
     content: |
-      # File system optimizations
+      net.ipv4.ip_local_port_range = 1024 65535
       fs.file-max = 2097152
       fs.nr_open = 1048576
+      
+      # Virtual memory optimizations
+      vm.swappiness = 10
+      vm.dirty_ratio = 15
+      vm.dirty_background_ratio = 5
 
   - path: /etc/security/limits.d/99-performance.conf
     content: |

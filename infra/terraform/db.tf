@@ -1,5 +1,5 @@
 resource "openstack_blockstorage_volume_v3" "postgres_disk" {
-  count                = var.vms_enabled ? 1 : 0
+  count                = 1
   name                 = "postgres-volume"
   volume_type          = "ceph-ssd"
   size                 = 50
