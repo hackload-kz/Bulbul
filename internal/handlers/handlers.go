@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"log"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -37,11 +36,11 @@ func (h *Handlers) CreateEvent(c *gin.Context) {
 	}
 
 	// Логируем полученные данные для отладки
-	log.Printf("Received event request: title=%s, external=%v", req.Title, req.External.Bool())
+	slog.Info("Received event request", "title", req.Title, "external", req.External.Bool())
 
 	response, err := h.services.Events.Create(c.Request.Context(), &req)
 	if err != nil {
-		log.Printf("Failed to create event: %v", err)
+		slog.Error("Failed to create event", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create event"})
 		return
 	}
@@ -52,25 +51,6 @@ func (h *Handlers) CreateEvent(c *gin.Context) {
 // ListEvents - GET /api/events
 // Получить список событий
 func (h *Handlers) ListEvents(c *gin.Context) {
-	// Add explicit panic recovery for this critical handler
-	defer func() {
-		if r := recover(); r != nil {
-			requestID, _ := c.Get("request_id")
-			slog.Error("PANIC in ListEvents handler",
-				"panic", r,
-				"request_id", requestID,
-				"method", c.Request.Method,
-				"path", c.Request.URL.Path,
-				"query", c.Request.URL.RawQuery)
-			if !c.Writer.Written() {
-				c.JSON(http.StatusInternalServerError, gin.H{
-					"error": "Internal server error",
-					"request_id": requestID,
-				})
-			}
-		}
-	}()
-	
 	query := c.Query("query")
 	date := c.Query("date")
 
@@ -91,57 +71,33 @@ func (h *Handlers) ListEvents(c *gin.Context) {
 
 	// Check if we should use caching
 	shouldCache := h.shouldCacheEventsRequest(query, date, pageSize)
-	
+
 	// Try to get from cache if conditions are met and cache client is available
 	if shouldCache && h.valkeyClient != nil {
 		// Use raw JSON to avoid unmarshaling/marshaling overhead
 		// Wrap in recovery to prevent cache issues from crashing the handler
-		func() {
-			defer func() {
-				if r := recover(); r != nil {
-					requestID, _ := c.Get("request_id")
-					slog.Error("PANIC in cache operation",
-						"panic", r,
-						"request_id", requestID,
-						"page", page,
-						"pageSize", pageSize)
-				}
-			}()
-			
-			rawJSON, err := h.valkeyClient.GetEventsListRaw(c.Request.Context(), page, pageSize)
-			if err == nil {
-				// Cache hit - return raw JSON data directly
-				log.Printf("Cache hit for events list: page=%d, pageSize=%d", page, pageSize)
-				c.Data(http.StatusOK, "application/json", rawJSON)
-				return
-			}
-			// Cache miss or error - continue to fetch from database
-			log.Printf("Cache miss for events list: page=%d, pageSize=%d, err=%v", page, pageSize, err)
-		}()
-		
-		// If response was already written by cache hit, return early
-		if c.Writer.Written() {
+		rawJSON, err := h.valkeyClient.GetEventsListRaw(c.Request.Context(), page, pageSize)
+		if err == nil {
+			// Cache hit - return raw JSON data directly
+			slog.Info("Cache hit for events list", "page", page, "pageSize", pageSize)
+			c.Data(http.StatusOK, "application/json", rawJSON)
 			return
 		}
+		// Cache miss or error - continue to fetch from database
+		slog.Info("Cache miss for events list", "page", page, "pageSize", pageSize, "error", err)
 	}
 
 	// Fetch from database
 	response, err := h.services.Events.List(c.Request.Context(), query, date, page, pageSize)
 	if err != nil {
-		log.Printf("Failed to list events: %v", err)
+		slog.Error("Failed to list events", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to list events"})
 		return
 	}
 
 	// Store in cache if conditions are met and cache client is available
 	if shouldCache && h.valkeyClient != nil {
-		err := h.valkeyClient.SetEventsList(c.Request.Context(), page, pageSize, response)
-		if err != nil {
-			log.Printf("Failed to cache events list: %v", err)
-			// Continue without caching - don't fail the request
-		} else {
-			log.Printf("Cached events list: page=%d, pageSize=%d", page, pageSize)
-		}
+		h.valkeyClient.SetEventsList(c.Request.Context(), page, pageSize, response)
 	}
 
 	c.JSON(http.StatusOK, response)
@@ -153,7 +109,7 @@ func (h *Handlers) shouldCacheEventsRequest(query, date string, pageSize int) bo
 	if query != "" || date != "" {
 		return false
 	}
-	
+
 	// Only cache if pageSize is divisible by 5
 	return pageSize%5 == 0
 }
@@ -171,7 +127,7 @@ func (h *Handlers) CreateBooking(c *gin.Context) {
 
 	response, err := h.services.Bookings.Create(c.Request.Context(), &req)
 	if err != nil {
-		log.Printf("Failed to create booking: %v", err)
+		slog.Error("Failed to create booking", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create booking"})
 		return
 	}
@@ -191,7 +147,7 @@ func (h *Handlers) ListBookings(c *gin.Context) {
 
 	response, err := h.services.Bookings.List(c.Request.Context(), userID)
 	if err != nil {
-		log.Printf("Failed to list bookings: %v", err)
+		slog.Error("Failed to list bookings", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to list bookings"})
 		return
 	}
@@ -210,7 +166,7 @@ func (h *Handlers) InitiatePayment(c *gin.Context) {
 
 	paymentURL, err := h.services.Bookings.InitiatePayment(c.Request.Context(), &req)
 	if err != nil {
-		log.Printf("Failed to initiate payment: %v", err)
+		slog.Error("Failed to initiate payment", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to initiate payment"})
 		return
 	}
@@ -236,7 +192,7 @@ func (h *Handlers) CancelBooking(c *gin.Context) {
 
 	err := h.services.Bookings.Cancel(c.Request.Context(), &req)
 	if err != nil {
-		log.Printf("Failed to cancel booking: %v", err)
+		slog.Error("Failed to cancel booking", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to cancel booking"})
 		return
 	}
@@ -285,7 +241,7 @@ func (h *Handlers) ListSeats(c *gin.Context) {
 
 	response, err := h.services.Seats.List(c.Request.Context(), eventID, page, pageSize, row, status)
 	if err != nil {
-		log.Printf("Failed to list seats: %v", err)
+		slog.Error("Failed to list seats", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to list seats"})
 		return
 	}
@@ -304,7 +260,7 @@ func (h *Handlers) SelectSeat(c *gin.Context) {
 
 	err := h.services.Seats.Select(c.Request.Context(), &req)
 	if err != nil {
-		log.Printf("Failed to select seat: %v", err)
+		slog.Error("Failed to select seat", "error", err)
 		c.JSON(419, gin.H{"error": "Failed to select seat"})
 		return
 	}
@@ -324,7 +280,7 @@ func (h *Handlers) ReleaseSeat(c *gin.Context) {
 
 	err := h.services.Seats.Release(c.Request.Context(), &req)
 	if err != nil {
-		log.Printf("Failed to release seat: %v", err)
+		slog.Error("Failed to release seat", "error", err)
 		c.JSON(419, gin.H{"error": "Failed to release seat"})
 		return
 	}
@@ -345,7 +301,7 @@ func (h *Handlers) NotifyPaymentCompleted(c *gin.Context) {
 	}
 
 	// For now, just log the success
-	log.Printf("Payment completed for order: %s", orderID)
+	slog.Info("Payment completed for order", "order_id", orderID)
 
 	// Согласно спецификации - возвращаем 200 без тела ответа
 	c.Status(http.StatusOK)
@@ -361,7 +317,7 @@ func (h *Handlers) NotifyPaymentFailed(c *gin.Context) {
 	}
 
 	// For now, just log the failure
-	log.Printf("Payment failed for order: %s", orderID)
+	slog.Error("Payment failed for order", "order_id", orderID)
 
 	// Согласно спецификации - возвращаем 200 без тела ответа
 	c.Status(http.StatusOK)
@@ -378,7 +334,7 @@ func (h *Handlers) OnPaymentUpdates(c *gin.Context) {
 
 	err := h.services.Bookings.HandlePaymentNotification(c.Request.Context(), &notification)
 	if err != nil {
-		log.Printf("Failed to handle payment notification: %v", err)
+		slog.Error("Failed to handle payment notification", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to handle notification"})
 		return
 	}

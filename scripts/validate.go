@@ -2,7 +2,7 @@ package main
 
 import (
 	"flag"
-	"log"
+	"log/slog"
 	"os"
 
 	"bulbul/internal/validation"
@@ -13,13 +13,13 @@ func main() {
 	flag.StringVar(&baseURL, "url", "http://localhost:8081", "Base URL for API validation")
 	flag.Parse()
 
-	log.Printf("Starting API validation against: %s", baseURL)
+	slog.Info("Starting API validation", "url", baseURL)
 	
 	validator := validation.NewSpecValidator(baseURL)
 	if err := validator.ValidateAll(); err != nil {
-		log.Fatalf("❌ Валидация не пройдена: %v", err)
+		slog.Error("❌ Валидация не пройдена", "error", err)
 		os.Exit(1)
 	}
 	
-	log.Println("✅ Валидация успешно пройдена!")
+	slog.Info("✅ Валидация успешно пройдена!")
 }

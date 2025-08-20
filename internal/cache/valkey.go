@@ -131,7 +131,7 @@ func (v *ValkeyClient) Close() error {
 // LogConnectionPoolStats logs current connection pool statistics for monitoring
 func (v *ValkeyClient) LogConnectionPoolStats(ctx context.Context) {
 	// Log pool configuration and usage for debugging
-	fmt.Printf("Valkey connection pool status - Client configured with auto-pipelining disabled\n")
+	slog.Info("Valkey connection pool status - Client configured with auto-pipelining disabled")
 }
 
 func (v *ValkeyClient) generateEventsListCacheKey(page, pageSize int) string {
@@ -207,13 +207,6 @@ func (v *ValkeyClient) GetEventsListRaw(ctx context.Context, page, pageSize int)
 	cacheCtx, cancel := context.WithTimeout(ctx, 1*time.Second)
 	defer cancel()
 
-	// Wrap cache operation with recovery to prevent panics
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Printf("PANIC in GetEventsListRaw: %v\n", r)
-		}
-	}()
-
 	// Use client-side caching with raw bytes for maximum performance
 	resp := v.client.DoCache(cacheCtx,
 		v.client.B().Get().Key(cacheKey).Cache(),
@@ -223,7 +216,7 @@ func (v *ValkeyClient) GetEventsListRaw(ctx context.Context, page, pageSize int)
 	// Check if served from client-side cache
 	if resp.IsCacheHit() {
 		// Ultra-fast path: served directly from client-side memory
-		fmt.Printf("Cache HIT (client-side) for events list: page=%d, pageSize=%d\n", page, pageSize)
+		slog.Info("Cache HIT (client-side) for events list", "page", page, "page_size", pageSize)
 	}
 
 	cachedData, err := resp.ToString()
@@ -233,10 +226,10 @@ func (v *ValkeyClient) GetEventsListRaw(ctx context.Context, page, pageSize int)
 		}
 		// Check for context timeout/cancellation - this is the likely culprit!
 		if cacheCtx.Err() != nil {
-			fmt.Printf("Cache operation TIMEOUT for events list: page=%d, pageSize=%d, err=%v\n", page, pageSize, cacheCtx.Err())
+			slog.Warn("Cache operation TIMEOUT for events list", "page", page, "page_size", pageSize, "error", cacheCtx.Err())
 			return nil, fmt.Errorf("cache operation timeout: %w", cacheCtx.Err())
 		}
-		fmt.Printf("Cache lookup ERROR for events list: page=%d, pageSize=%d, err=%v\n", page, pageSize, err)
+		slog.Error("Cache lookup ERROR for events list", "page", page, "page_size", pageSize, "error", err)
 		return nil, fmt.Errorf("cache lookup error: %w", err)
 	}
 

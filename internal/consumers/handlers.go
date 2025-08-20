@@ -3,7 +3,7 @@ package consumers
 import (
 	"context"
 	"encoding/json"
-	"log"
+	"log/slog"
 
 	"github.com/nats-io/stan.go"
 	"bulbul/internal/models"
@@ -28,11 +28,11 @@ func NewHandlers(repos *repository.Repositories, ticketingClient *external.Ticke
 func (h *Handlers) HandleBookingCreated(m *stan.Msg) {
 	var event models.BookingCreatedEvent
 	if err := json.Unmarshal(m.Data, &event); err != nil {
-		log.Printf("Failed to unmarshal booking created event: %v", err)
+		slog.Error("Failed to unmarshal booking created event", "error", err)
 		return
 	}
 
-	log.Printf("Processing booking created event: %+v", event)
+	slog.Info("Processing booking created event", "event", event)
 
 	// For now, just acknowledge the message
 	// In a real implementation, we might:
@@ -46,24 +46,24 @@ func (h *Handlers) HandleBookingCreated(m *stan.Msg) {
 func (h *Handlers) HandlePaymentInitiated(m *stan.Msg) {
 	var event models.PaymentInitiatedEvent
 	if err := json.Unmarshal(m.Data, &event); err != nil {
-		log.Printf("Failed to unmarshal payment initiated event: %v", err)
+		slog.Error("Failed to unmarshal payment initiated event", "error", err)
 		return
 	}
 
-	log.Printf("Processing payment initiated event: %+v", event)
+	slog.Info("Processing payment initiated event", "event", event)
 
 	// Update booking status to reflect payment initiation
 	ctx := context.Background()
 	booking, err := h.repos.Bookings.GetByID(ctx, event.BookingID)
 	if err != nil {
-		log.Printf("Failed to get booking %d: %v", event.BookingID, err)
+		slog.Error("Failed to get booking", "booking_id", event.BookingID, "error", err)
 		return
 	}
 
 	if booking != nil {
 		booking.PaymentStatus = "INITIATED"
 		if err := h.repos.Bookings.Update(ctx, booking); err != nil {
-			log.Printf("Failed to update booking %d: %v", event.BookingID, err)
+			slog.Error("Failed to update booking", "booking_id", event.BookingID, "error", err)
 			return
 		}
 	}
@@ -74,18 +74,18 @@ func (h *Handlers) HandlePaymentInitiated(m *stan.Msg) {
 func (h *Handlers) HandlePaymentCompleted(m *stan.Msg) {
 	var event models.PaymentCompletedEvent
 	if err := json.Unmarshal(m.Data, &event); err != nil {
-		log.Printf("Failed to unmarshal payment completed event: %v", err)
+		slog.Error("Failed to unmarshal payment completed event", "error", err)
 		return
 	}
 
-	log.Printf("Processing payment completed event: %+v", event)
+	slog.Info("Processing payment completed event", "event", event)
 
 	ctx := context.Background()
 
 	// Update booking status
 	booking, err := h.repos.Bookings.GetByID(ctx, event.BookingID)
 	if err != nil {
-		log.Printf("Failed to get booking %d: %v", event.BookingID, err)
+		slog.Error("Failed to get booking", "booking_id", event.BookingID, "error", err)
 		return
 	}
 
@@ -93,20 +93,20 @@ func (h *Handlers) HandlePaymentCompleted(m *stan.Msg) {
 		booking.Status = "CONFIRMED"
 		booking.PaymentStatus = "COMPLETED"
 		if err := h.repos.Bookings.Update(ctx, booking); err != nil {
-			log.Printf("Failed to update booking %d: %v", event.BookingID, err)
+			slog.Error("Failed to update booking", "booking_id", event.BookingID, "error", err)
 			return
 		}
 
 		// Update seat statuses to SOLD
 		seats, err := h.repos.Bookings.GetSeats(ctx, booking.ID)
 		if err != nil {
-			log.Printf("Failed to get booking seats %d: %v", event.BookingID, err)
+			slog.Error("Failed to get booking seats", "booking_id", event.BookingID, "error", err)
 			return
 		}
 
 		for _, seat := range seats {
 			if err := h.repos.Seats.UpdateStatus(ctx, seat.ID, "SOLD"); err != nil {
-				log.Printf("Failed to update seat %d status: %v", seat.ID, err)
+				slog.Error("Failed to update seat status", "seat_id", seat.ID, "error", err)
 			}
 		}
 
@@ -115,7 +115,7 @@ func (h *Handlers) HandlePaymentCompleted(m *stan.Msg) {
 			// In a real implementation, we'd need proper order ID mapping
 			orderID := event.OrderID
 			if err := h.ticketingClient.ConfirmOrder(orderID); err != nil {
-				log.Printf("Failed to confirm external order %s: %v", orderID, err)
+				slog.Error("Failed to confirm external order", "order_id", orderID, "error", err)
 			}
 		}
 	}
@@ -126,18 +126,18 @@ func (h *Handlers) HandlePaymentCompleted(m *stan.Msg) {
 func (h *Handlers) HandlePaymentFailed(m *stan.Msg) {
 	var event models.PaymentFailedEvent
 	if err := json.Unmarshal(m.Data, &event); err != nil {
-		log.Printf("Failed to unmarshal payment failed event: %v", err)
+		slog.Error("Failed to unmarshal payment failed event", "error", err)
 		return
 	}
 
-	log.Printf("Processing payment failed event: %+v", event)
+	slog.Info("Processing payment failed event", "event", event)
 
 	ctx := context.Background()
 
 	// Update booking status
 	booking, err := h.repos.Bookings.GetByID(ctx, event.BookingID)
 	if err != nil {
-		log.Printf("Failed to get booking %d: %v", event.BookingID, err)
+		slog.Error("Failed to get booking", "booking_id", event.BookingID, "error", err)
 		return
 	}
 
@@ -145,20 +145,20 @@ func (h *Handlers) HandlePaymentFailed(m *stan.Msg) {
 		booking.Status = "CANCELLED"
 		booking.PaymentStatus = "FAILED"
 		if err := h.repos.Bookings.Update(ctx, booking); err != nil {
-			log.Printf("Failed to update booking %d: %v", event.BookingID, err)
+			slog.Error("Failed to update booking", "booking_id", event.BookingID, "error", err)
 			return
 		}
 
 		// Release all seats
 		seats, err := h.repos.Bookings.GetSeats(ctx, booking.ID)
 		if err != nil {
-			log.Printf("Failed to get booking seats %d: %v", event.BookingID, err)
+			slog.Error("Failed to get booking seats", "booking_id", event.BookingID, "error", err)
 			return
 		}
 
 		for _, seat := range seats {
 			if err := h.repos.Seats.ReleaseSeat(ctx, seat.ID); err != nil {
-				log.Printf("Failed to release seat %d: %v", seat.ID, err)
+				slog.Error("Failed to release seat", "seat_id", seat.ID, "error", err)
 			}
 		}
 
@@ -167,7 +167,7 @@ func (h *Handlers) HandlePaymentFailed(m *stan.Msg) {
 			// In a real implementation, we'd need proper order ID mapping
 			orderID := event.OrderID
 			if err := h.ticketingClient.CancelOrder(orderID); err != nil {
-				log.Printf("Failed to cancel external order %s: %v", orderID, err)
+				slog.Error("Failed to cancel external order", "order_id", orderID, "error", err)
 			}
 		}
 	}
@@ -178,11 +178,11 @@ func (h *Handlers) HandlePaymentFailed(m *stan.Msg) {
 func (h *Handlers) HandleSeatSelected(m *stan.Msg) {
 	var event models.SeatSelectedEvent
 	if err := json.Unmarshal(m.Data, &event); err != nil {
-		log.Printf("Failed to unmarshal seat selected event: %v", err)
+		slog.Error("Failed to unmarshal seat selected event", "error", err)
 		return
 	}
 
-	log.Printf("Processing seat selected event: %+v", event)
+	slog.Info("Processing seat selected event", "event", event)
 
 	// For now, just log the event
 	// In a real implementation, we might:
@@ -196,11 +196,11 @@ func (h *Handlers) HandleSeatSelected(m *stan.Msg) {
 func (h *Handlers) HandleSeatReleased(m *stan.Msg) {
 	var event models.SeatReleasedEvent
 	if err := json.Unmarshal(m.Data, &event); err != nil {
-		log.Printf("Failed to unmarshal seat released event: %v", err)
+		slog.Error("Failed to unmarshal seat released event", "error", err)
 		return
 	}
 
-	log.Printf("Processing seat released event: %+v", event)
+	slog.Info("Processing seat released event", "event", event)
 
 	// For now, just log the event
 	// In a real implementation, we might:
@@ -214,11 +214,11 @@ func (h *Handlers) HandleSeatReleased(m *stan.Msg) {
 func (h *Handlers) HandleBookingCancelled(m *stan.Msg) {
 	var event models.BookingCancelledEvent
 	if err := json.Unmarshal(m.Data, &event); err != nil {
-		log.Printf("Failed to unmarshal booking cancelled event: %v", err)
+		slog.Error("Failed to unmarshal booking cancelled event", "error", err)
 		return
 	}
 
-	log.Printf("Processing booking cancelled event: %+v", event)
+	slog.Info("Processing booking cancelled event", "event", event)
 
 	// For now, just log the event
 	// In a real implementation, we might:

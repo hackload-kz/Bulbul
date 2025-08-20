@@ -2,7 +2,7 @@ package consumers
 
 import (
 	"context"
-	"log"
+	"log/slog"
 
 	"bulbul/internal/config"
 	"bulbul/internal/database"
@@ -50,7 +50,7 @@ func NewConsumerService(cfg *config.Config) (*ConsumerService, error) {
 }
 
 func (cs *ConsumerService) Start() error {
-	log.Println("Starting NATS consumers...")
+	slog.Info("Starting NATS consumers...")
 
 	// Subscribe to booking events
 	_, err := cs.nats.SubscribeQueue("booking.created", "consumers", cs.handlers.HandleBookingCreated)
@@ -91,22 +91,22 @@ func (cs *ConsumerService) Start() error {
 		return err
 	}
 
-	log.Println("All consumers started successfully")
+	slog.Info("All consumers started successfully")
 	return nil
 }
 
 func (cs *ConsumerService) Shutdown(ctx context.Context) error {
-	log.Println("Shutting down consumer service...")
+	slog.Info("Shutting down consumer service...")
 
 	if cs.nats != nil {
 		if err := cs.nats.Close(); err != nil {
-			log.Printf("Error closing NATS connection: %v", err)
+			slog.Error("Error closing NATS connection", "error", err)
 		}
 	}
 
 	if cs.db != nil {
 		if err := cs.db.Close(); err != nil {
-			log.Printf("Error closing database connection: %v", err)
+			slog.Error("Error closing database connection", "error", err)
 			return err
 		}
 	}

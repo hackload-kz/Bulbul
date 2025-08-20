@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 )
 
@@ -58,7 +58,7 @@ func (db *DB) HealthCheck(ctx context.Context) HealthCheck {
 	if err != nil {
 		healthCheck.Status = "unhealthy"
 		healthCheck.Error = err.Error()
-		log.Printf("Database health check failed: %v", err)
+		slog.Error("Database health check failed", "error", err)
 	} else {
 		healthCheck.Status = "healthy"
 	}
@@ -71,20 +71,20 @@ func (db *DB) ValidateConnectionPool() error {
 	
 	// Check for potential connection leaks
 	if stats.InUse > int(float64(stats.MaxOpenConnections)*0.9) {
-		log.Printf("Warning: High connection usage detected. InUse: %d, MaxOpen: %d", 
-			stats.InUse, stats.MaxOpenConnections)
+		slog.Warn("High connection usage detected", 
+			"in_use", stats.InUse, "max_open", stats.MaxOpenConnections)
 	}
 
 	// Check for high wait times
 	if stats.WaitCount > 0 && stats.WaitDuration > time.Second {
-		log.Printf("Warning: High database wait times detected. WaitCount: %d, WaitDuration: %v", 
-			stats.WaitCount, stats.WaitDuration)
+		slog.Warn("High database wait times detected", 
+			"wait_count", stats.WaitCount, "wait_duration", stats.WaitDuration)
 	}
 
 	// Check for excessive idle connection closures
 	if stats.MaxIdleClosed > 1000 {
-		log.Printf("Info: Many idle connections have been closed. Consider adjusting MaxIdleConns. Closed: %d", 
-			stats.MaxIdleClosed)
+		slog.Info("Many idle connections have been closed - consider adjusting MaxIdleConns", 
+			"closed", stats.MaxIdleClosed)
 	}
 
 	return nil
@@ -109,7 +109,8 @@ func (db *DB) ExecuteWithRetry(ctx context.Context, query string, args ...interf
 		}
 
 		if attempt < maxRetries {
-			log.Printf("Database query failed (attempt %d/%d), retrying: %v", attempt, maxRetries, err)
+			slog.Warn("Database query failed, retrying", 
+				"attempt", attempt, "max_retries", maxRetries, "error", err)
 			time.Sleep(time.Duration(attempt) * backoffDelay)
 		}
 	}

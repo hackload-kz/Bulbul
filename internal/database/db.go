@@ -3,7 +3,7 @@ package database
 import (
 	"database/sql"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	_ "github.com/lib/pq"
@@ -46,8 +46,10 @@ func Connect(cfg Config) (*DB, error) {
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	log.Printf("Connected to database: %s:%d/%s (MaxOpen: %d, MaxIdle: %d, MaxLifetime: %dm, MaxIdleTime: %dm)", 
-		cfg.Host, cfg.Port, cfg.DBName, cfg.MaxOpenConns, cfg.MaxIdleConns, cfg.ConnMaxLifetimeMin, cfg.ConnMaxIdleTimeMin)
+	slog.Info("Connected to database", 
+		"host", cfg.Host, "port", cfg.Port, "dbname", cfg.DBName,
+		"max_open_conns", cfg.MaxOpenConns, "max_idle_conns", cfg.MaxIdleConns,
+		"max_lifetime_min", cfg.ConnMaxLifetimeMin, "max_idle_time_min", cfg.ConnMaxIdleTimeMin)
 
 	return &DB{db}, nil
 }

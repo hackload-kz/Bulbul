@@ -4,8 +4,9 @@ import (
 	"database/sql"
 	"flag"
 	"fmt"
-	"log"
+	"log/slog"
 	"math/rand"
+	"os"
 	"time"
 
 	"bulbul/internal/config"
@@ -28,26 +29,29 @@ type SeatGenerator struct {
 func main() {
 	flag.Parse()
 
-	log.Println("Starting seat generator...")
+	slog.Info("Starting seat generator...")
 
 	cfg := config.Load()
 	db, err := database.Connect(cfg.Database)
 	if err != nil {
-		log.Fatal("Failed to connect to database:", err)
+		slog.Error("Failed to connect to database", "error", err)
+		os.Exit(1)
 	}
 	defer db.Close()
 
 	if err := db.RunMigrations(); err != nil {
-		log.Fatal("Failed to run migrations:", err)
+		slog.Error("Failed to run migrations", "error", err)
+		os.Exit(1)
 	}
 
 	generator := &SeatGenerator{db: db}
 
 	if err := generator.GenerateSeats(); err != nil {
-		log.Fatal("Failed to generate seats:", err)
+		slog.Error("Failed to generate seats", "error", err)
+		os.Exit(1)
 	}
 
-	log.Println("Seat generation completed successfully!")
+	slog.Info("Seat generation completed successfully!")
 }
 
 func (g *SeatGenerator) GenerateSeats() error {
@@ -57,18 +61,18 @@ func (g *SeatGenerator) GenerateSeats() error {
 	}
 
 	if len(events) == 0 {
-		log.Println("No events found for seat generation")
+		slog.Info("No events found for seat generation")
 		return nil
 	}
 
-	log.Printf("Found %d events for seat generation", len(events))
+	slog.Info("Found events for seat generation", "count", len(events))
 
 	for _, event := range events {
 		if err := g.generateSeatsForEvent(event); err != nil {
-			log.Printf("Failed to generate seats for event %d (%s): %v", event.ID, event.Title, err)
+			slog.Error("Failed to generate seats for event", "event_id", event.ID, "title", event.Title, "error", err)
 			continue
 		}
-		log.Printf("Generated seats for event %d: %s", event.ID, event.Title)
+		slog.Info("Generated seats for event", "event_id", event.ID, "title", event.Title)
 	}
 
 	return nil
@@ -126,14 +130,14 @@ func (g *SeatGenerator) generateSeatsForEvent(event models.Event) error {
 			return fmt.Errorf("failed to check existing seats: %w", err)
 		}
 		if existingCount > 0 {
-			log.Printf("Event %d already has %d seats, skipping (use -clear to override)", event.ID, existingCount)
+			slog.Info("Event already has seats, skipping (use -clear to override)", "event_id", event.ID, "existing_count", existingCount)
 			return nil
 		}
 	}
 
 	if *dryRun {
 		totalSeats := rand.Intn(901) + 100
-		log.Printf("[DRY RUN] Would generate %d seats for event %d (%s)", totalSeats, event.ID, event.Title)
+		slog.Info("[DRY RUN] Would generate seats for event", "total_seats", totalSeats, "event_id", event.ID, "title", event.Title)
 		return nil
 	}
 
@@ -164,7 +168,7 @@ func (g *SeatGenerator) generateSeatsForEvent(event models.Event) error {
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	log.Printf("Generated %d seats for event %d", totalSeats, event.ID)
+	slog.Info("Generated seats for event", "total_seats", totalSeats, "event_id", event.ID)
 	return nil
 }
 

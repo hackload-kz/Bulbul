@@ -2,11 +2,11 @@ package database
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 )
 
 func (db *DB) RunMigrations() error {
-	log.Println("Running database migrations...")
+	slog.Info("Running database migrations...")
 
 	migrations := []string{
 		createUsersTable,
@@ -18,13 +18,13 @@ func (db *DB) RunMigrations() error {
 	}
 
 	for i, migration := range migrations {
-		log.Printf("Running migration %d...", i+1)
+		slog.Info("Running migration", "step", i+1)
 		if _, err := db.Exec(migration); err != nil {
 			return fmt.Errorf("migration %d failed: %w", i+1, err)
 		}
 	}
 
-	log.Println("All migrations completed successfully")
+	slog.Info("All migrations completed successfully")
 	return nil
 }
 

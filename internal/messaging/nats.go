@@ -3,7 +3,7 @@ package messaging
 import (
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/nats-io/stan.go"
@@ -46,7 +46,7 @@ func (nc *NATSClient) Publish(subject string, data interface{}) error {
 		return fmt.Errorf("failed to publish to subject %s: %w", subject, err)
 	}
 
-	log.Printf("Published message to subject: %s", subject)
+	slog.Info("Published message to subject", "subject", subject)
 	return nil
 }
 
@@ -56,7 +56,7 @@ func (nc *NATSClient) Subscribe(subject string, handler stan.MsgHandler) (stan.S
 		return nil, fmt.Errorf("failed to subscribe to subject %s: %w", subject, err)
 	}
 
-	log.Printf("Subscribed to subject: %s", subject)
+	slog.Info("Subscribed to subject", "subject", subject)
 	return sub, nil
 }
 
@@ -69,7 +69,7 @@ func (nc *NATSClient) SubscribeQueue(subject, queue string, handler stan.MsgHand
 		return nil, fmt.Errorf("failed to queue subscribe to subject %s: %w", subject, err)
 	}
 
-	log.Printf("Subscribed to subject: %s (queue: %s)", subject, queue)
+	slog.Info("Subscribed to subject", "subject", subject, "queue", queue)
 	return sub, nil
 }
 

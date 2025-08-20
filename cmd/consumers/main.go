@@ -2,17 +2,18 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"bulbul/internal/config"
 	"bulbul/internal/consumers"
+	"bulbul/internal/logger"
 )
 
 func main() {
-	log.Println("Starting consumers service...")
+	slog.Info("Starting consumers service...")
 
 	// Load configuration
 	cfg := config.Load()
@@ -23,30 +24,30 @@ func main() {
 	// Create and start consumers
 	consumerService, err := consumers.NewConsumerService(cfg)
 	if err != nil {
-		log.Fatalf("Failed to create consumer service: %v", err)
+		logger.Fatal("Failed to create consumer service", "error", err)
 	}
 
 	// Start consuming messages
 	if err := consumerService.Start(); err != nil {
-		log.Fatalf("Failed to start consumers: %v", err)
+		logger.Fatal("Failed to start consumers", "error", err)
 	}
 
-	log.Println("Consumers service started successfully")
+	slog.Info("Consumers service started successfully")
 
 	// Wait for interrupt signal to gracefully shutdown
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	log.Println("Shutting down consumers service...")
+	slog.Info("Shutting down consumers service...")
 
 	// Graceful shutdown
 	ctx, cancel := context.WithTimeout(context.Background(), 30)
 	defer cancel()
 
 	if err := consumerService.Shutdown(ctx); err != nil {
-		log.Printf("Error during shutdown: %v", err)
+		slog.Error("Error during shutdown", "error", err)
 	}
 
-	log.Println("Consumers service stopped")
+	slog.Info("Consumers service stopped")
 }

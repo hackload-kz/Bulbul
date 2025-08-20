@@ -56,23 +56,13 @@ func Get() *slog.Logger {
 // WithContext returns a logger with context-specific fields
 func WithContext(ctx context.Context) *slog.Logger {
 	logger := Get()
-	
-	// Add request ID if available
-	if reqID := ctx.Value("request_id"); reqID != nil {
-		logger = logger.With("request_id", reqID)
-	}
-	
+
 	// Add user ID if available
 	if userID := ctx.Value("user_id"); userID != nil {
 		logger = logger.With("user_id", userID)
 	}
-	
-	return logger
-}
 
-// WithRequestID returns a logger with a request ID attached
-func WithRequestID(requestID string) *slog.Logger {
-	return Get().With("request_id", requestID)
+	return logger
 }
 
 // WithUserID returns a logger with a user ID attached
