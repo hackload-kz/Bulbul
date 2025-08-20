@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"strconv"
 	"time"
@@ -33,7 +34,7 @@ func NewValkeyClient() (*ValkeyClient, error) {
 
 	// Parse cache TTL configurations
 	authCacheTTL := getEnvDuration("VALKEY_AUTH_CACHE_TTL_MIN", 10*time.Minute)
-	eventsCacheTTL := getEnvDuration("VALKEY_EVENTS_CACHE_TTL_MIN", 5*time.Minute)
+	eventsCacheTTL := getEnvDuration("VALKEY_EVENTS_CACHE_TTL_MIN", 15*time.Minute)
 
 	// Parse cache size in MB
 	cacheSizeMB := getEnvInt("VALKEY_CLIENT_CACHE_SIZE_MB", 128)
@@ -41,20 +42,20 @@ func NewValkeyClient() (*ValkeyClient, error) {
 
 	// Create rueidis client with comprehensive connection pool settings
 	client, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress:  []string{addr},
-		Password:     password,
-		SelectDB:     0,
-		
+		InitAddress: []string{addr},
+		Password:    password,
+		SelectDB:    0,
+
 		// Client-side caching configuration
 		CacheSizeEachConn: int(cacheSizeBytes),
-		
+
 		// Connection pool configuration to prevent blocking/exhaustion
-		ConnWriteTimeout:     5 * time.Second,  // Detect hanging connections quickly
-		BlockingPoolSize:     64,               // Increase pool size for concurrent requests
-		PipelineMultiplex:    8,                // Limit concurrent pipelined commands
+		ConnWriteTimeout:      5 * time.Second, // Detect hanging connections quickly
+		BlockingPoolSize:      64,              // Increase pool size for concurrent requests
+		PipelineMultiplex:     8,               // Limit concurrent pipelined commands
 		DisableAutoPipelining: true,            // Avoid Head-of-Line blocking under load
-		AlwaysRESP2:         true,              // Use RESP2 for better compatibility
-		
+		AlwaysRESP2:           true,            // Use RESP2 for better compatibility
+
 		// Note: Connection timeouts are handled by ConnWriteTimeout above
 	})
 	if err != nil {
@@ -139,43 +140,43 @@ func (v *ValkeyClient) generateEventsListCacheKey(page, pageSize int) string {
 
 func (v *ValkeyClient) SetEventsList(ctx context.Context, page, pageSize int, events interface{}) error {
 	cacheKey := v.generateEventsListCacheKey(page, pageSize)
-	
+
 	eventData, err := json.Marshal(events)
 	if err != nil {
 		return fmt.Errorf("failed to marshal events data: %w", err)
 	}
-	
+
 	// Use background context with timeout for cache SET operations (non-blocking)
 	// This prevents cache writes from affecting response times
 	cacheCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	
+
 	// Use regular Do() for SET operations (not cacheable)
 	serverTTL := v.eventsCacheTTL
 	err = v.client.Do(cacheCtx,
 		v.client.B().Set().Key(cacheKey).Value(string(eventData)).Ex(serverTTL).Build(),
 	).Error()
-	
+
 	if err != nil {
-		return fmt.Errorf("failed to set events cache: %w", err)
+		slog.Error("failed to set events cache", "error", err)
 	}
-	
+
 	return nil
 }
 
 func (v *ValkeyClient) GetEventsList(ctx context.Context, page, pageSize int, result interface{}) error {
 	cacheKey := v.generateEventsListCacheKey(page, pageSize)
-	
+
 	// Create a timeout context for cache operations (2 seconds max)
 	cacheCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
-	
+
 	// Use client-side caching for GET operations
 	resp := v.client.DoCache(cacheCtx,
 		v.client.B().Get().Key(cacheKey).Cache(),
 		v.eventsCacheTTL,
 	)
-	
+
 	cachedData, err := resp.ToString()
 	if err != nil {
 		if rueidis.IsRedisNil(err) {
@@ -187,12 +188,12 @@ func (v *ValkeyClient) GetEventsList(ctx context.Context, page, pageSize int, re
 		}
 		return fmt.Errorf("cache lookup error: %w", err)
 	}
-	
+
 	err = json.Unmarshal([]byte(cachedData), result)
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal cached events data: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -201,30 +202,30 @@ func (v *ValkeyClient) GetEventsList(ctx context.Context, page, pageSize int, re
 // Uses client-side caching for maximum performance with fallback strategy
 func (v *ValkeyClient) GetEventsListRaw(ctx context.Context, page, pageSize int) ([]byte, error) {
 	cacheKey := v.generateEventsListCacheKey(page, pageSize)
-	
+
 	// Create a timeout context for cache operations (1 second max for reads)
 	cacheCtx, cancel := context.WithTimeout(ctx, 1*time.Second)
 	defer cancel()
-	
+
 	// Wrap cache operation with recovery to prevent panics
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Printf("PANIC in GetEventsListRaw: %v\n", r)
 		}
 	}()
-	
+
 	// Use client-side caching with raw bytes for maximum performance
 	resp := v.client.DoCache(cacheCtx,
 		v.client.B().Get().Key(cacheKey).Cache(),
 		v.eventsCacheTTL,
 	)
-	
+
 	// Check if served from client-side cache
 	if resp.IsCacheHit() {
 		// Ultra-fast path: served directly from client-side memory
 		fmt.Printf("Cache HIT (client-side) for events list: page=%d, pageSize=%d\n", page, pageSize)
 	}
-	
+
 	cachedData, err := resp.ToString()
 	if err != nil {
 		if rueidis.IsRedisNil(err) {
@@ -238,6 +239,6 @@ func (v *ValkeyClient) GetEventsListRaw(ctx context.Context, page, pageSize int)
 		fmt.Printf("Cache lookup ERROR for events list: page=%d, pageSize=%d, err=%v\n", page, pageSize, err)
 		return nil, fmt.Errorf("cache lookup error: %w", err)
 	}
-	
+
 	return []byte(cachedData), nil
 }
