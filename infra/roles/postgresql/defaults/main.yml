@@ -47,7 +47,7 @@ postgresql_authentication_timeout: "1min"
 postgresql_postgres_password: "postgres_admin_123"
 
 # Data loading configuration
-postgresql_load_data: true
+postgresql_load_data: false
 postgresql_data_dir: "/tmp/postgresql_data"
 
 # Data source URLs

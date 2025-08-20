@@ -21,6 +21,14 @@
       - libfontconfig1
     state: present
 
+- name: Enable IPv4 IP forwarding (persistent)
+  sysctl:
+    name: net.ipv4.ip_forward
+    value: '1'
+    state: present
+    sysctl_file: /etc/sysctl.d/99-bulbul.conf
+    reload: yes
+    
 # Prometheus Installation
 - name: Create prometheus group
   group:

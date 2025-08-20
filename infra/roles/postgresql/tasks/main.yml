@@ -81,6 +81,14 @@
     delay: 5
     timeout: 30
 
+- name: Set postgres user password
+  postgresql_user:
+    name: postgres
+    password: "{{ postgresql_postgres_password }}"
+    encrypted: yes
+    login_user: postgres
+  become_user: postgres
+
 - name: Configure PostgreSQL authentication (secure - password auth for postgres)
   template:
     src: pg_hba_secure.conf.j2
@@ -150,6 +158,21 @@
     login_user: postgres
     login_password: "{{ postgresql_postgres_password }}"
     login_host: localhost
+
+- name: fulltext-index sql file
+  template:
+    src: "fulltext-index.sql"
+    dest: "{{ postgresql_data_dir }}/fulltext-index.sql"
+
+- name: Create fulltext-index
+  postgresql_db:
+    name: "{{ postgresql_database }}"
+    state: restore
+    target: "{{ postgresql_data_dir }}/fulltext-index.sql"
+    login_user: postgres
+    login_password: "{{ postgresql_postgres_password }}"
+    login_host: localhost
+  when: postgresql_load_data
 
 - name: Download users.sql
   get_url:
