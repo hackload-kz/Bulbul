@@ -23,3 +23,6 @@ CREATE TABLE IF NOT EXISTS events_archive (
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS events_datetime_start_date_idx 
+ON events_archive (DATE(datetime_start));

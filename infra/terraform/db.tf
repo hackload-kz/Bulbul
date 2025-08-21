@@ -50,7 +50,7 @@ resource "openstack_networking_port_v2" "valkey_port" {
 resource "openstack_compute_instance_v2" "valkey_server" {
   count = var.vms_enabled ? 1 : 0
   name        = "valkey"
-  flavor_name = "d1.ram8cpu4"
+  flavor_name = "d1.ram2cpu1"
   key_pair    = openstack_compute_keypair_v2.ssh.name
 
   user_data = file("${path.module}/resources/cloud-init.yml")

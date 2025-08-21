@@ -14,9 +14,9 @@ services:
       - NATS_URL=nats://nats:4222
       - NATS_CLUSTER_ID=bulbul
       - NATS_CLIENT_ID=biletter-api
+      - VALKEY_ADDR=valkey:6379
     depends_on:
       - postgres
-      - nats
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/health"]

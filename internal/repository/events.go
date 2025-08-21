@@ -69,6 +69,7 @@ func (r *EventRepository) List(ctx context.Context, query string, date string, p
 	var events []models.Event
 	var args []interface{}
 	argIndex := 1
+	var searchQueryArgIndex int
 
 	sqlQuery := `
 		SELECT id, title, description, type, datetime_start, provider, external, total_seats, created_at, updated_at
@@ -78,14 +79,11 @@ func (r *EventRepository) List(ctx context.Context, query string, date string, p
 	// Add search filter with full-text search
 	if query != "" {
 		// Use PostgreSQL full-text search with Russian language support
+		searchQueryArgIndex = argIndex
 		sqlQuery += fmt.Sprintf(" AND search_vector @@ to_tsquery('russian', $%d)", argIndex)
 		
 		// Prepare search query - handle multiple words and special characters
-		searchQuery := query
-		// Add :* suffix for prefix matching if the query doesn't contain special operators
-		if !containsSearchOperators(searchQuery) {
-			searchQuery = searchQuery + ":*"
-		}
+		searchQuery := prepareSearchQuery(query)
 		
 		args = append(args, searchQuery)
 		argIndex++
@@ -100,7 +98,7 @@ func (r *EventRepository) List(ctx context.Context, query string, date string, p
 
 	// Add ordering - prioritize search relevance if searching, otherwise by ID
 	if query != "" {
-		sqlQuery += " ORDER BY ts_rank(search_vector, to_tsquery('russian', $" + fmt.Sprintf("%d", len(args)) + ")) DESC, id ASC"
+		sqlQuery += " ORDER BY ts_rank(search_vector, to_tsquery('russian', $" + fmt.Sprintf("%d", searchQueryArgIndex) + ")) DESC, id ASC"
 	} else {
 		sqlQuery += " ORDER BY id ASC"
 	}
@@ -163,6 +161,30 @@ func (r *EventRepository) Update(ctx context.Context, event *models.Event) error
 	)
 
 	return err
+}
+
+// prepareSearchQuery formats a search query for PostgreSQL full-text search
+func prepareSearchQuery(query string) string {
+	// If query contains operators, return as-is
+	if containsSearchOperators(query) {
+		return query
+	}
+	
+	// Split by spaces and handle each word
+	words := strings.Fields(strings.TrimSpace(query))
+	if len(words) == 0 {
+		return ""
+	}
+	
+	// Add prefix matching to each word and join with AND operator
+	var formattedWords []string
+	for _, word := range words {
+		if word != "" {
+			formattedWords = append(formattedWords, word+":*")
+		}
+	}
+	
+	return strings.Join(formattedWords, " & ")
 }
 
 // containsSearchOperators checks if the search query contains PostgreSQL search operators

@@ -14,6 +14,7 @@ func (db *DB) RunMigrations() error {
 		createSeatsTable,
 		createBookingsTable,
 		createBookingSeatsTable,
+		createEventsDateIndex,
 	}
 
 	for i, migration := range migrations {
@@ -97,3 +98,7 @@ CREATE TABLE IF NOT EXISTS booking_seats (
     
     UNIQUE(booking_id, seat_id)
 );`
+
+const createEventsDateIndex = `
+CREATE INDEX IF NOT EXISTS events_datetime_start_date_idx 
+ON events_archive (DATE(datetime_start));`

@@ -21,7 +21,7 @@ valkey_save: ""
 valkey_stop_writes_on_bgsave_error: "no"
 valkey_rdbcompression: "no"
 valkey_rdbchecksum: "no"
-valkey_appendonly: "yes"
+valkey_appendonly: "no"
 valkey_appendfsync: "no"
 
 # Data loading for users cache

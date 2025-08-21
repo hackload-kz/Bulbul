@@ -1,0 +1,56 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+README.md
+docs/
+*.md
+
+# Development files
+.vscode/
+.idea/
+
+# Data directories
+data/
+tests/
+
+# Infrastructure
+infra/
+terraform/
+ansible.cfg
+playbook.yml
+
+# Environment files
+.env
+.env.local
+.env.production
+.env.development
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
+
+# Build artifacts (keep binaries out)
+cmd/api/api-server
+
+# Scripts
+scripts/
+
+# Load tests
+tests/load-test/
+
+# Mise configuration
+mise.toml
+
+# Docker files (we don't need them in the build context)
+docker-compose.yml
+docker-compose.*.yml
+Dockerfile*
