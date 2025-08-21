@@ -15,6 +15,9 @@ valkey_server ansible_host=${valkey_ip} ansible_user=ubuntu
 [monitoring]
 monitoring_server ansible_host=${monitoring_public_ip} ansible_user=ubuntu
 
+[workloads:children]
+api_servers
+
 [all:vars]
 ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyCommand="ssh -W %h:%p -q ubuntu@${monitoring_public_ip}"'
 ansible_python_interpreter=/usr/bin/python3

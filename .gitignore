@@ -239,3 +239,4 @@ data
 infra/files/api-server
 .ansible-password
 .ansible_password
+.env

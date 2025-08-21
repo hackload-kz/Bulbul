@@ -10,6 +10,9 @@ Host 192.168.0.*
   IdentityFile ~/.ssh/id_ed25519_hackload
 ```
 
+Create ansible vault password file `infra/.ansible_password` and put there
+vault password.
+
 Init environment variables:
 
 ```
