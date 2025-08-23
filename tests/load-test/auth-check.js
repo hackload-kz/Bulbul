@@ -23,7 +23,12 @@ const userCredentials = {
 }
 
 export const options = {
+    vus: 1,
     iterations: 6,
+    thresholds: {
+        'http_reqs': ['count===42'],
+        'checks': ['rate>=1']
+    },
 };
 
 export default function () {
@@ -55,11 +60,11 @@ export default function () {
 
     // user 1 lists places
     const listSeatsResponse = http.get(`${BASE_URL}/api/seats?event_id=1`, params1);
-    console.log('List places: ${listSeatsResponse.status}');
+    console.log(`List places: ${listSeatsResponse.status}`);
     check(listSeatsResponse, {
         'статус 200': (r) => r.status === 200
     });
-    console.log(listSeatsResponse.status);
+    console.log();
     const seats = JSON.parse(listSeatsResponse.body);
 
     // user 1 decides to buy a ticket for the first available seat
@@ -87,7 +92,7 @@ export default function () {
     // user 2 tries to release the selected seat buy user 1
     const releaseSeatRequest = {seat_id: seat.id};
     const releaseSeatResponse = http.patch(`${BASE_URL}/api/seats/release`, JSON.stringify(releaseSeatRequest), params2)
-    console.log(`Release seat: ${releaseSeatResponse}`);
+    console.log(`Release seat: ${releaseSeatResponse.status}`);
     check(releaseSeatResponse, {
         'статус 403': (r) => r.status === 403
     })
@@ -108,9 +113,9 @@ export default function () {
         'статус 200': (r) => r.status === 200 || r.status === 201
     })
 
-    // user 2 cancels the booking
+    // user 1 cancels the booking
     const cancelBookingRequestByOwner = {booking_id: booking.id}
-    const cancelBookingResponseByOwner = http.patch(`${BASE_URL}/api/bookings/cancel`, JSON.stringify(cancelBookingRequestByOwner), params2)
+    const cancelBookingResponseByOwner = http.patch(`${BASE_URL}/api/bookings/cancel`, JSON.stringify(cancelBookingRequestByOwner), params1)
     console.log(`Cancel booking: ${cancelBookingResponseByOwner.status}`);
     check(cancelBookingResponseByOwner, {
         'статус 200': (r) => r.status === 200 || r.status === 201

@@ -74,8 +74,7 @@ func (h *Handlers) InitiatePayment(c *gin.Context) {
 
 	paymentURL, err := h.services.Bookings.InitiatePayment(c.Request.Context(), &req)
 	if err != nil {
-		slog.Error("Failed to initiate payment", "error", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to initiate payment"})
+		h.handleServiceError(c, err, "Failed to initiate payment")
 		return
 	}
 

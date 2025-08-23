@@ -1,0 +1,22 @@
+meta {
+  name: Seats release
+  type: http
+  seq: 10
+}
+
+patch {
+  url: {{base_url}}/api/seats/select
+  body: json
+  auth: basic
+}
+
+auth:basic {
+  username: {{default_user_email}}
+  password: {{default_user_password}}
+}
+
+body:json {
+  {
+    "seat_id": "6ab0070b-992b-4559-b107-48ab4ad6dd43"
+  }
+}

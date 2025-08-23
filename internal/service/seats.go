@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"bulbul/internal/errors"
 	"bulbul/internal/external"
 	"bulbul/internal/messaging"
 	"bulbul/internal/middleware"
@@ -68,10 +69,11 @@ func (s *SeatService) Select(ctx context.Context, req *models.SelectSeatRequest)
 	// Authorization: verify user owns this booking
 	if userID, ok := middleware.UserIDFromContext(ctx); ok {
 		if booking.UserID == nil || *booking.UserID != userID {
-			return fmt.Errorf("unauthorized: booking does not belong to current user")
+			return errors.ErrForbidden
+
 		}
 	} else {
-		return fmt.Errorf("unauthorized: user not authenticated")
+		return errors.ErrUnauthorized
 	}
 
 	// Get seat to verify it exists (all events use local database)
@@ -119,10 +121,10 @@ func (s *SeatService) Release(ctx context.Context, req *models.ReleaseSeatReques
 	// Authorization: verify user owns this booking
 	if userID, ok := middleware.UserIDFromContext(ctx); ok {
 		if booking.UserID == nil || *booking.UserID != userID {
-			return fmt.Errorf("unauthorized: booking does not belong to current user")
+			return errors.ErrForbidden
 		}
 	} else {
-		return fmt.Errorf("unauthorized: user not authenticated")
+		return errors.ErrUnauthorized
 	}
 
 	// Release seat from database (all events use local database)

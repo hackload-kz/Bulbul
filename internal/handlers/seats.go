@@ -69,8 +69,7 @@ func (h *Handlers) SelectSeat(c *gin.Context) {
 
 	err := h.services.Seats.Select(c.Request.Context(), &req)
 	if err != nil {
-		slog.Error("Failed to select seat", "error", err)
-		c.JSON(419, gin.H{"error": "Failed to select seat"})
+		h.handleServiceError(c, err, "Failed to select seat")
 		return
 	}
 
@@ -89,8 +88,7 @@ func (h *Handlers) ReleaseSeat(c *gin.Context) {
 
 	err := h.services.Seats.Release(c.Request.Context(), &req)
 	if err != nil {
-		slog.Error("Failed to release seat", "error", err)
-		c.JSON(419, gin.H{"error": "Failed to release seat"})
+		h.handleServiceError(c, err, "Failed to release seat")
 		return
 	}
 

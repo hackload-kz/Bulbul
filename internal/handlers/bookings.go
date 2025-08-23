@@ -61,8 +61,7 @@ func (h *Handlers) CancelBooking(c *gin.Context) {
 
 	err := h.services.Bookings.Cancel(c.Request.Context(), &req)
 	if err != nil {
-		slog.Error("Failed to cancel booking", "error", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to cancel booking"})
+		h.handleServiceError(c, err, "Failed to cancel booking")
 		return
 	}
 
