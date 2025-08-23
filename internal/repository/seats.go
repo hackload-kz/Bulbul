@@ -288,3 +288,10 @@ func (r *SeatRepository) BulkCreateSeats(ctx context.Context, seats []models.Sea
 
 	return tx.Commit()
 }
+
+// ResetAllSeats marks all seats as FREE
+func (r *SeatRepository) ResetAllSeats(ctx context.Context) error {
+	query := `UPDATE seats SET status = 'FREE', updated_at = NOW()`
+	_, err := r.db.ExecContext(ctx, query)
+	return err
+}

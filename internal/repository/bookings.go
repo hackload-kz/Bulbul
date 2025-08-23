@@ -241,3 +241,26 @@ func (r *BookingRepository) GetExpiredBookings(ctx context.Context, expirationTi
 
 	return bookings, rows.Err()
 }
+
+// DeleteAll removes all bookings and booking_seats from the database
+func (r *BookingRepository) DeleteAll(ctx context.Context) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// First delete all booking_seats due to foreign key constraints
+	_, err = tx.ExecContext(ctx, "DELETE FROM booking_seats")
+	if err != nil {
+		return err
+	}
+
+	// Then delete all bookings
+	_, err = tx.ExecContext(ctx, "DELETE FROM bookings")
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}

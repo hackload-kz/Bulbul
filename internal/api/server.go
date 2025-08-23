@@ -156,6 +156,9 @@ func (s *Server) setupRoutes() {
 		}
 	}
 
+	// Reset endpoint (no authentication required)
+	s.router.POST("/api/reset", h.ResetDatabase)
+
 	// Health check and monitoring endpoints
 	s.router.GET("/health", s.healthCheck)
 	s.router.GET("/health/db", s.dbHealthCheck)
