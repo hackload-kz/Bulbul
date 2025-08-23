@@ -1,0 +1,72 @@
+<mxfile host="65bd71144e">
+    <diagram id="bulbul-infra" name="OpenStack Infrastructure">
+        <mxGraphModel dx="2660" dy="1138" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="2" style="edgeStyle=none;html=1;entryX=0;entryY=0.75;entryDx=0;entryDy=0;" edge="1" parent="1" source="internet" target="fip_lb">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="3" style="edgeStyle=none;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="internet" target="fip_mon">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="internet" value="Internet" style="ellipse;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;gradientColor=#b9d0f4;shadow=0;" parent="1" vertex="1">
+                    <mxGeometry x="-1140" y="320" width="120" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="privnet" value="internal (192.168.0.0/24)" style="swimlane;horizontal=1;startSize=28;rounded=0;fillColor=#e1f5fe;strokeColor=#0288d1;" parent="1" vertex="1">
+                    <mxGeometry x="-890" y="150" width="860" height="520" as="geometry"/>
+                </mxCell>
+                <mxCell id="lb" value="Load Balancer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#0288d1;" parent="privnet" vertex="1">
+                    <mxGeometry x="110" y="170" width="150" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="apis" value="API Server(s)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#0288d1;" parent="privnet" vertex="1">
+                    <mxGeometry x="360" y="170" width="150" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="pg" value="Postgres" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#0288d1;" parent="privnet" vertex="1">
+                    <mxGeometry x="650" y="160" width="180" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="valkey" value="Valkey" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#0288d1;" parent="privnet" vertex="1">
+                    <mxGeometry x="650" y="70" width="180" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="es" value="Elasticsearch" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#0288d1;" parent="privnet" vertex="1">
+                    <mxGeometry x="650" y="250" width="180" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="mon" value="Monitoring&lt;br&gt;(SSH proxy jump, prometheus, grafana)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#0288d1;" parent="privnet" vertex="1">
+                    <mxGeometry x="105" y="350" width="160" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_lb_api" value="HTTP proxy" style="edgeStyle=elbowEdgeStyle;endArrow=block;html=1;strokeColor=#0288d1;" parent="privnet" source="lb" target="apis" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_api_pg" value="DB" style="edgeStyle=elbowEdgeStyle;endArrow=block;html=1;strokeColor=#0288d1;" parent="privnet" source="apis" target="pg" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_api_valkey" value="Cache" style="edgeStyle=elbowEdgeStyle;endArrow=block;html=1;strokeColor=#0288d1;" parent="privnet" source="apis" target="valkey" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="560" y="195"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e_api_es" value="Search" style="edgeStyle=elbowEdgeStyle;endArrow=block;html=1;strokeColor=#0288d1;" parent="privnet" source="apis" target="es" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="560" y="260"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="4" style="edgeStyle=none;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="privnet" source="fip_lb" target="lb">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="fip_lb" value="Floating IP" style="rounded=1;whiteSpace=wrap;html=1;" parent="privnet" vertex="1">
+                    <mxGeometry x="-60" y="182.5" width="120" height="25" as="geometry"/>
+                </mxCell>
+                <mxCell id="fip_mon" value="Floating IP" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;" parent="privnet" vertex="1">
+                    <mxGeometry x="-60" y="387.5" width="120" height="25" as="geometry"/>
+                </mxCell>
+                <mxCell id="5" style="edgeStyle=none;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="privnet" source="fip_mon" target="mon">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>
