@@ -179,7 +179,7 @@ func (c *ElasticsearchClient) GetByID(ctx context.Context, id int64) (*models.Ev
 	}
 
 	if res.IsError() {
-		return nil, fmt.Errorf("Elasticsearch error: %s", res.String())
+		return nil, fmt.Errorf("elasticsearch error: %s", res.String())
 	}
 
 	var response struct {
@@ -196,7 +196,7 @@ func (c *ElasticsearchClient) GetByID(ctx context.Context, id int64) (*models.Ev
 // Search выполняет поиск событий
 func (c *ElasticsearchClient) Search(ctx context.Context, query, date string, page, pageSize int) ([]models.Event, error) {
 	searchQuery := c.buildSearchQuery(query, date)
-	
+
 	// Calculate offset
 	from := 0
 	if page > 0 && pageSize > 0 {
@@ -208,9 +208,9 @@ func (c *ElasticsearchClient) Search(ctx context.Context, query, date string, pa
 
 	searchRequest := map[string]interface{}{
 		"query": searchQuery,
-		"sort": c.buildSortQuery(query),
-		"from": from,
-		"size": pageSize,
+		"sort":  c.buildSortQuery(query),
+		"from":  from,
+		"size":  pageSize,
 	}
 
 	searchJSON, err := json.Marshal(searchRequest)
@@ -261,9 +261,9 @@ func (c *ElasticsearchClient) buildSearchQuery(query, date string) map[string]in
 	if query != "" {
 		mustQueries = append(mustQueries, map[string]interface{}{
 			"multi_match": map[string]interface{}{
-				"query":    query,
-				"fields":   []string{"title^2", "description"},
-				"analyzer": "russian_analyzer",
+				"query":     query,
+				"fields":    []string{"title^2", "description"},
+				"analyzer":  "russian_analyzer",
 				"fuzziness": "AUTO",
 			},
 		})
@@ -312,13 +312,6 @@ func (c *ElasticsearchClient) buildSortQuery(query string) []map[string]interfac
 
 // IndexEvent индексирует событие
 func (c *ElasticsearchClient) IndexEvent(ctx context.Context, event *models.Event) error {
-	if event.CreatedAt.IsZero() {
-		event.CreatedAt = time.Now()
-	}
-	if event.UpdatedAt.IsZero() {
-		event.UpdatedAt = time.Now()
-	}
-
 	eventJSON, err := json.Marshal(event)
 	if err != nil {
 		return fmt.Errorf("failed to marshal event: %w", err)
@@ -346,7 +339,6 @@ func (c *ElasticsearchClient) IndexEvent(ctx context.Context, event *models.Even
 
 // UpdateEvent обновляет событие
 func (c *ElasticsearchClient) UpdateEvent(ctx context.Context, event *models.Event) error {
-	event.UpdatedAt = time.Now()
 	return c.IndexEvent(ctx, event)
 }
 

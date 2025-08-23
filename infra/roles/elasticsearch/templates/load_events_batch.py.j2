@@ -178,13 +178,6 @@ def main():
                         except Exception as e:
                             print(f"Warning: Failed to parse datetime for event {event.get('id', 'unknown')}: {e}")
                     
-                    # Add created_at and updated_at timestamps
-                    now = datetime.now().isoformat()
-                    if 'created_at' not in event or not event['created_at']:
-                        event['created_at'] = now
-                    if 'updated_at' not in event or not event['updated_at']:
-                        event['updated_at'] = now
-                    
                     # Prepare document for Elasticsearch
                     doc = {
                         "_index": index_name,

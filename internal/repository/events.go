@@ -3,7 +3,6 @@ package repository
 import (
 	"context"
 	"math"
-	"time"
 
 	"bulbul/internal/models"
 	"bulbul/internal/search"
@@ -17,20 +16,6 @@ type EventElasticsearchRepository struct {
 // NewEventElasticsearchRepository создает новый репозиторий событий с Elasticsearch
 func NewEventElasticsearchRepository(es *search.ElasticsearchClient) *EventElasticsearchRepository {
 	return &EventElasticsearchRepository{es: es}
-}
-
-// Create создает новое событие
-func (r *EventElasticsearchRepository) Create(ctx context.Context, event *models.Event) error {
-	// Set timestamps
-	now := time.Now()
-	if event.CreatedAt.IsZero() {
-		event.CreatedAt = now
-	}
-	if event.UpdatedAt.IsZero() {
-		event.UpdatedAt = now
-	}
-
-	return r.es.IndexEvent(ctx, event)
 }
 
 // GetByID получает событие по ID

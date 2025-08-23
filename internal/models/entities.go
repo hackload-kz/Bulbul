@@ -28,8 +28,6 @@ type Event struct {
 	Provider      string    `json:"provider" db:"provider"`
 	External      bool      `json:"external" db:"external"`
 	TotalSeats    int       `json:"total_seats" db:"total_seats"`
-	CreatedAt     time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at" db:"updated_at"`
 }
 
 // Seat represents a seat for an event

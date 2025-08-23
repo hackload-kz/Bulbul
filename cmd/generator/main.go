@@ -111,8 +111,6 @@ func (g *SeatGenerator) getEventsForSeatGeneration() ([]models.Event, error) {
 			&event.Provider,
 			&event.External,
 			&event.TotalSeats,
-			&event.CreatedAt,
-			&event.UpdatedAt,
 		)
 		if err != nil {
 			return nil, err

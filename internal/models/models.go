@@ -52,8 +52,9 @@ type ListEventsResponse []ListEventsResponseItem
 
 // ListBookingsResponseItem - элемент списка бронирований
 type ListBookingsResponseItem struct {
-	ID      int64 `json:"id"`
-	EventID int64 `json:"event_id"`
+    ID      int64 `json:"id"`
+    EventID int64 `json:"event_id"`
+    Seats   []ListSeatsResponseItem `json:"seats,omitempty"`
 }
 
 // ListBookingsResponse - список бронирований

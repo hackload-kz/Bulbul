@@ -201,27 +201,27 @@
     mode: '0644'
   when: elasticsearch_load_events_data
 
-- name: Copy events_archive.json.zip to target
-  copy:
-    src: events_archive.json.zip
-    dest: "{{ elasticsearch_data_source_dir }}/events_archive.json.zip"
-    mode: '0644'
-  when: elasticsearch_load_events_data
+# - name: Copy events_archive.json.zip to target
+#   copy:
+#     src: events_archive.json.zip
+#     dest: "{{ elasticsearch_data_source_dir }}/events_archive.json.zip"
+#     mode: '0644'
+#   when: elasticsearch_load_events_data
 
-- name: Install unzip package
-  apt:
-    name: unzip
-    state: present
-  become: yes
-  when: elasticsearch_load_events_data
+# - name: Install unzip package
+#   apt:
+#     name: unzip
+#     state: present
+#   become: yes
+#   when: elasticsearch_load_events_data
 
-- name: Extract events_archive.json.zip
-  unarchive:
-    src: "{{ elasticsearch_data_source_dir }}/events_archive.json.zip"
-    dest: "{{ elasticsearch_data_source_dir }}"
-    remote_src: yes
-    creates: "{{ elasticsearch_data_source_dir }}/events_archive.json"
-  when: elasticsearch_load_events_data
+# - name: Extract events_archive.json.zip
+#   unarchive:
+#     src: "{{ elasticsearch_data_source_dir }}/events_archive.json.zip"
+#     dest: "{{ elasticsearch_data_source_dir }}"
+#     remote_src: yes
+#     creates: "{{ elasticsearch_data_source_dir }}/events_archive.json"
+#   when: elasticsearch_load_events_data
 
 # Create and run data loading scripts
 - name: Create events loading script
@@ -248,16 +248,16 @@
     var: events_load_result.stdout_lines
   when: elasticsearch_load_events_data and events_load_result.stdout_lines is defined
 
-- name: Load events_archive.json data to Elasticsearch (batch processing)
-  command: python3 "{{ elasticsearch_data_source_dir }}/load_events_batch.py" "{{ elasticsearch_data_source_dir }}/events_archive.json" "{{ elasticsearch_events_index }}"
-  register: archive_load_result
-  timeout: 3600  # 1 hour timeout for large file processing
-  when: elasticsearch_load_events_data
+# - name: Load events_archive.json data to Elasticsearch (batch processing)
+#   command: python3 "{{ elasticsearch_data_source_dir }}/load_events_batch.py" "{{ elasticsearch_data_source_dir }}/events_archive.json" "{{ elasticsearch_events_index }}"
+#   register: archive_load_result
+#   timeout: 3600  # 1 hour timeout for large file processing
+#   when: elasticsearch_load_events_data
 
-- name: Display archive loading results
-  debug:
-    var: archive_load_result.stdout_lines
-  when: elasticsearch_load_events_data and archive_load_result.stdout_lines is defined
+# - name: Display archive loading results
+#   debug:
+#     var: archive_load_result.stdout_lines
+#   when: elasticsearch_load_events_data and archive_load_result.stdout_lines is defined
 
 # Verify data loading
 - name: Check index document count

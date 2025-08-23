@@ -68,20 +68,46 @@ func (s *BookingService) Create(ctx context.Context, req *models.CreateBookingRe
 }
 
 func (s *BookingService) List(ctx context.Context, userID int64) ([]models.ListBookingsResponseItem, error) {
-	bookings, err := s.bookingRepo.GetByUserID(ctx, userID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get bookings: %w", err)
-	}
+    bookings, err := s.bookingRepo.GetByUserID(ctx, userID)
+    if err != nil {
+        return nil, fmt.Errorf("failed to get bookings: %w", err)
+    }
 
-	result := make([]models.ListBookingsResponseItem, len(bookings))
-	for i, booking := range bookings {
-		result[i] = models.ListBookingsResponseItem{
-			ID:      booking.ID,
-			EventID: booking.EventID,
-		}
-	}
+    result := make([]models.ListBookingsResponseItem, len(bookings))
+    for i, booking := range bookings {
+        item := models.ListBookingsResponseItem{
+            ID:      booking.ID,
+            EventID: booking.EventID,
+        }
 
-	return result, nil
+        // Load seats for each booking
+        seats, err := s.bookingRepo.GetSeats(ctx, booking.ID)
+        if err != nil {
+            return nil, fmt.Errorf("failed to get seats for booking %d: %w", booking.ID, err)
+        }
+
+        if len(seats) > 0 {
+            mapped := make([]models.ListSeatsResponseItem, len(seats))
+            for j, seat := range seats {
+                price := "0"
+                if seat.Price != nil {
+                    price = fmt.Sprintf("%d", *seat.Price)
+                }
+                mapped[j] = models.ListSeatsResponseItem{
+                    ID:     seat.ID,
+                    Row:    int64(seat.Row),
+                    Number: int64(seat.Number),
+                    Status: seat.Status,
+                    Price:  price,
+                }
+            }
+            item.Seats = mapped
+        }
+
+        result[i] = item
+    }
+
+    return result, nil
 }
 
 func (s *BookingService) InitiatePayment(ctx context.Context, req *models.InitiatePaymentRequest) (string, error) {

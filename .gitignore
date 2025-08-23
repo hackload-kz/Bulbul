@@ -236,7 +236,8 @@ terraform.tfstate.backup
 /.idea/
 data
 .claude
-infra/files/api-server
+infra/files/*
 .ansible-password
 .ansible_password
 .env
+
