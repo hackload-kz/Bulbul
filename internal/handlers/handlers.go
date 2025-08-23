@@ -30,12 +30,17 @@ func (h *Handlers) handleServiceError(c *gin.Context, err error, defaultMessage 
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
-	
+
 	if errors.Is(err, internalErrors.ErrForbidden) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Forbidden"})
 		return
 	}
-	
+
+	if errors.Is(err, internalErrors.ErrSeatIsNotAvailable) {
+		c.JSON(419, gin.H{"error": err.Error()})
+		return
+	}
+
 	// Default to internal server error for other errors
 	slog.Error(defaultMessage, "error", err)
 	c.JSON(http.StatusInternalServerError, gin.H{"error": defaultMessage})

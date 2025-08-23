@@ -7,6 +7,7 @@ import (
 	"math/rand"
 
 	"bulbul/internal/database"
+	"bulbul/internal/errors"
 	"bulbul/internal/models"
 )
 
@@ -151,7 +152,7 @@ func (r *SeatRepository) ReserveSeat(ctx context.Context, seatID string, booking
 	}
 
 	if currentStatus != "FREE" {
-		return fmt.Errorf("seat is not available")
+		return errors.ErrSeatIsNotAvailable
 	}
 
 	// Reserve the seat
