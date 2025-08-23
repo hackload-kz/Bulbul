@@ -14,13 +14,13 @@ import (
 
 type SeatService struct {
 	seatRepo        *repository.SeatRepository
-	eventRepo       *repository.EventRepository
+	eventRepo       *repository.EventElasticsearchRepository
 	bookingRepo     *repository.BookingRepository
 	ticketingClient *external.TicketingClient
 	natsClient      *messaging.NATSClient
 }
 
-func NewSeatService(seatRepo *repository.SeatRepository, eventRepo *repository.EventRepository, bookingRepo *repository.BookingRepository, ticketingClient *external.TicketingClient, natsClient *messaging.NATSClient) *SeatService {
+func NewSeatService(seatRepo *repository.SeatRepository, eventRepo *repository.EventElasticsearchRepository, bookingRepo *repository.BookingRepository, ticketingClient *external.TicketingClient, natsClient *messaging.NATSClient) *SeatService {
 	return &SeatService{
 		seatRepo:        seatRepo,
 		eventRepo:       eventRepo,

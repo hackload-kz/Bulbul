@@ -15,8 +15,11 @@ services:
       - NATS_CLUSTER_ID=bulbul
       - NATS_CLIENT_ID=biletter-api
       - VALKEY_ADDR=valkey:6379
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - ELASTICSEARCH_INDEX=events
     depends_on:
       - postgres
+      - elasticsearch
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/health"]
@@ -53,6 +56,46 @@ services:
       - ./data/valkey:/data
     restart: unless-stopped
     command: valkey-server --appendonly yes
+
+  elasticsearch:
+    image: elasticsearch:8.11.0
+    ports:
+      - "9200:9200"
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+      - xpack.security.enabled=false
+      - indices.query.bool.max_clause_count=10000
+      - cluster.routing.allocation.disk.threshold_enabled=false
+    volumes:
+      - ./data/elasticsearch:/usr/share/elasticsearch/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  events-loader:
+    image: python:3.12-slim
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    volumes:
+      - ./scripts:/app/scripts:ro
+      - ./data:/app/data:ro
+    working_dir: /app/scripts
+    environment:
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - ELASTICSEARCH_INDEX=events
+      - DATA_FILE=/app/data/events.json
+    command: >
+      sh -c "
+        pip install elasticsearch==8.11.0 requests &&
+        python load_events_to_elasticsearch.py
+      "
+    restart: "no"
 
   postgres:
     image: postgres:16-alpine

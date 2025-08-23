@@ -162,22 +162,6 @@
     login_host: localhost
   when: postgresql_load_data
 
-- name: fulltext-index sql file
-  template:
-    src: "fulltext-index.sql"
-    dest: "{{ postgresql_data_dir }}/fulltext-index.sql"
-  when: postgresql_load_data
-
-- name: Create fulltext-index
-  postgresql_db:
-    name: "{{ postgresql_database }}"
-    state: restore
-    target: "{{ postgresql_data_dir }}/fulltext-index.sql"
-    login_user: postgres
-    login_password: "{{ postgresql_postgres_password }}"
-    login_host: localhost
-  when: postgresql_load_data
-
 - name: Download users.sql
   get_url:
     url: "{{ postgresql_data_sources.users_sql }}"
@@ -185,33 +169,33 @@
     mode: '0644'
   when: postgresql_load_data
 
-- name: Download events.sql
-  get_url:
-    url: "{{ postgresql_data_sources.events_sql }}"
-    dest: "{{ postgresql_data_dir }}/events.sql"
-    mode: '0644'
-  when: postgresql_load_data
+# - name: Download events.sql
+#   get_url:
+#     url: "{{ postgresql_data_sources.events_sql }}"
+#     dest: "{{ postgresql_data_dir }}/events.sql"
+#     mode: '0644'
+#   when: postgresql_load_data
 
-- name: Download events_archive.sql.zip
-  get_url:
-    url: "{{ postgresql_data_sources.events_archive_zip }}"
-    dest: "{{ postgresql_data_dir }}/events_archive.sql.zip"
-    mode: '0644'
-  when: postgresql_load_data
+# - name: Download events_archive.sql.zip
+#   get_url:
+#     url: "{{ postgresql_data_sources.events_archive_zip }}"
+#     dest: "{{ postgresql_data_dir }}/events_archive.sql.zip"
+#     mode: '0644'
+#   when: postgresql_load_data
 
-- name: Install unzip for extracting archive
-  apt:
-    name: unzip
-    state: present
-  when: postgresql_load_data
+# - name: Install unzip for extracting archive
+#   apt:
+#     name: unzip
+#     state: present
+#   when: postgresql_load_data
 
-- name: Extract events_archive.sql.zip
-  unarchive:
-    src: "{{ postgresql_data_dir }}/events_archive.sql.zip"
-    dest: "{{ postgresql_data_dir }}"
-    remote_src: yes
-    creates: "{{ postgresql_data_dir }}/events_archive.sql"
-  when: postgresql_load_data
+# - name: Extract events_archive.sql.zip
+#   unarchive:
+#     src: "{{ postgresql_data_dir }}/events_archive.sql.zip"
+#     dest: "{{ postgresql_data_dir }}"
+#     remote_src: yes
+#     creates: "{{ postgresql_data_dir }}/events_archive.sql"
+#   when: postgresql_load_data
 
 - name: Load users.sql data
   postgresql_db:
@@ -223,25 +207,25 @@
     login_host: localhost
   when: postgresql_load_data
 
-- name: Load events.sql data
-  postgresql_db:
-    name: "{{ postgresql_database }}"
-    state: restore
-    target: "{{ postgresql_data_dir }}/events.sql"
-    login_user: postgres
-    login_password: "{{ postgresql_postgres_password }}"
-    login_host: localhost
-  when: postgresql_load_data
+# - name: Load events.sql data
+#   postgresql_db:
+#     name: "{{ postgresql_database }}"
+#     state: restore
+#     target: "{{ postgresql_data_dir }}/events.sql"
+#     login_user: postgres
+#     login_password: "{{ postgresql_postgres_password }}"
+#     login_host: localhost
+#   when: postgresql_load_data
 
-- name: Load events_archive.sql data
-  postgresql_db:
-    name: "{{ postgresql_database }}"
-    state: restore
-    target: "{{ postgresql_data_dir }}/events_archive.sql"
-    login_user: postgres
-    login_password: "{{ postgresql_postgres_password }}"
-    login_host: localhost
-  when: postgresql_load_data
+# - name: Load events_archive.sql data
+#   postgresql_db:
+#     name: "{{ postgresql_database }}"
+#     state: restore
+#     target: "{{ postgresql_data_dir }}/events_archive.sql"
+#     login_user: postgres
+#     login_password: "{{ postgresql_postgres_password }}"
+#     login_host: localhost
+#   when: postgresql_load_data
 
 - name: Clean up downloaded files
   file:

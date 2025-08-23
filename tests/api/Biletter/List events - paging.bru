@@ -1,0 +1,21 @@
+meta {
+  name: List events - paging
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{base_url}}/api/events?page=2&pageSize=16
+  body: none
+  auth: basic
+}
+
+params:query {
+  page: 2
+  pageSize: 16
+}
+
+auth:basic {
+  username: {{default_user_email}}
+  password: {{default_user_password}}
+}

@@ -2,198 +2,73 @@ package repository
 
 import (
 	"context"
-	"database/sql"
-	"fmt"
-	"strings"
+	"math"
 	"time"
 
-	"bulbul/internal/database"
 	"bulbul/internal/models"
+	"bulbul/internal/search"
 )
 
-type EventRepository struct {
-	db *database.DB
+// EventElasticsearchRepository реализует репозиторий событий с использованием Elasticsearch
+type EventElasticsearchRepository struct {
+	es *search.ElasticsearchClient
 }
 
-func NewEventRepository(db *database.DB) *EventRepository {
-	return &EventRepository{db: db}
+// NewEventElasticsearchRepository создает новый репозиторий событий с Elasticsearch
+func NewEventElasticsearchRepository(es *search.ElasticsearchClient) *EventElasticsearchRepository {
+	return &EventElasticsearchRepository{es: es}
 }
 
-func (r *EventRepository) Create(ctx context.Context, event *models.Event) error {
-	query := `
-		INSERT INTO events_archive (title, description, type, datetime_start, provider, external, total_seats)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
-		RETURNING id, created_at, updated_at`
+// Create создает новое событие
+func (r *EventElasticsearchRepository) Create(ctx context.Context, event *models.Event) error {
+	// Set timestamps
+	now := time.Now()
+	if event.CreatedAt.IsZero() {
+		event.CreatedAt = now
+	}
+	if event.UpdatedAt.IsZero() {
+		event.UpdatedAt = now
+	}
 
-	err := r.db.QueryRowContext(ctx, query,
-		event.Title,
-		event.Description,
-		event.Type,
-		event.DatetimeStart,
-		event.Provider,
-		event.External,
-		event.TotalSeats,
-	).Scan(&event.ID, &event.CreatedAt, &event.UpdatedAt)
-
-	return err
+	return r.es.IndexEvent(ctx, event)
 }
 
-func (r *EventRepository) GetByID(ctx context.Context, id int64) (*models.Event, error) {
-	event := &models.Event{}
-	query := `
-		SELECT id, title, description, type, datetime_start, provider, external, total_seats, created_at, updated_at
-		FROM events_archive
-		WHERE id = $1`
-
-	err := r.db.QueryRowContext(ctx, query, id).Scan(
-		&event.ID,
-		&event.Title,
-		&event.Description,
-		&event.Type,
-		&event.DatetimeStart,
-		&event.Provider,
-		&event.External,
-		&event.TotalSeats,
-		&event.CreatedAt,
-		&event.UpdatedAt,
-	)
-
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
-
-	return event, err
+// GetByID получает событие по ID
+func (r *EventElasticsearchRepository) GetByID(ctx context.Context, id int64) (*models.Event, error) {
+	return r.es.GetByID(ctx, id)
 }
 
-func (r *EventRepository) List(ctx context.Context, query string, date string, page, pageSize int) ([]models.Event, error) {
-	var events []models.Event
-	var args []interface{}
-	argIndex := 1
-	var searchQueryArgIndex int
+// List возвращает список событий с поддержкой поиска, фильтрации и пагинации
+func (r *EventElasticsearchRepository) List(ctx context.Context, query string, date string, page, pageSize int) ([]models.Event, error) {
+	return r.es.Search(ctx, query, date, page, pageSize)
+}
 
-	sqlQuery := `
-		SELECT id, title, description, type, datetime_start, provider, external, total_seats, created_at, updated_at
-		FROM events_archive
-		WHERE 1=1`
+// Update обновляет событие
+func (r *EventElasticsearchRepository) Update(ctx context.Context, event *models.Event) error {
+	return r.es.UpdateEvent(ctx, event)
+}
 
-	// Add search filter with full-text search
-	if query != "" {
-		// Use PostgreSQL full-text search with Russian language support
-		searchQueryArgIndex = argIndex
-		sqlQuery += fmt.Sprintf(" AND search_vector @@ to_tsquery('russian', $%d)", argIndex)
-		
-		// Prepare search query - handle multiple words and special characters
-		searchQuery := prepareSearchQuery(query)
-		
-		args = append(args, searchQuery)
-		argIndex++
+// Delete удаляет событие
+func (r *EventElasticsearchRepository) Delete(ctx context.Context, id int64) error {
+	return r.es.DeleteEvent(ctx, id)
+}
+
+// Count возвращает общее количество событий с учетом фильтров
+func (r *EventElasticsearchRepository) Count(ctx context.Context, query string, date string) (int64, error) {
+	return r.es.Count(ctx, query, date)
+}
+
+// GetTotalPages вычисляет общее количество страниц для пагинации
+func (r *EventElasticsearchRepository) GetTotalPages(ctx context.Context, query string, date string, pageSize int) (int, error) {
+	if pageSize <= 0 {
+		return 0, nil
 	}
 
-	// Add date filter
-	if date != "" {
-		sqlQuery += fmt.Sprintf(" AND DATE(datetime_start) = $%d", argIndex)
-		args = append(args, date)
-		argIndex++
-	}
-
-	// Add ordering - prioritize search relevance if searching, otherwise by ID
-	if query != "" {
-		sqlQuery += " ORDER BY ts_rank(search_vector, to_tsquery('russian', $" + fmt.Sprintf("%d", searchQueryArgIndex) + ")) DESC, id ASC"
-	} else {
-		sqlQuery += " ORDER BY id ASC"
-	}
-
-	// Add pagination
-	if page > 0 && pageSize > 0 {
-		offset := (page - 1) * pageSize
-		sqlQuery += fmt.Sprintf(" LIMIT $%d OFFSET $%d", argIndex, argIndex+1)
-		args = append(args, pageSize, offset)
-	}
-
-	rows, err := r.db.QueryContext(ctx, sqlQuery, args...)
+	totalCount, err := r.Count(ctx, query, date)
 	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var event models.Event
-		err := rows.Scan(
-			&event.ID,
-			&event.Title,
-			&event.Description,
-			&event.Type,
-			&event.DatetimeStart,
-			&event.Provider,
-			&event.External,
-			&event.TotalSeats,
-			&event.CreatedAt,
-			&event.UpdatedAt,
-		)
-		if err != nil {
-			return nil, err
-		}
-		events = append(events, event)
+		return 0, err
 	}
 
-	return events, rows.Err()
-}
-
-func (r *EventRepository) Update(ctx context.Context, event *models.Event) error {
-	query := `
-		UPDATE events_archive 
-		SET title = $1, description = $2, type = $3, datetime_start = $4, 
-		    provider = $5, external = $6, total_seats = $7, updated_at = $8
-		WHERE id = $9`
-
-	event.UpdatedAt = time.Now()
-
-	_, err := r.db.ExecContext(ctx, query,
-		event.Title,
-		event.Description,
-		event.Type,
-		event.DatetimeStart,
-		event.Provider,
-		event.External,
-		event.TotalSeats,
-		event.UpdatedAt,
-		event.ID,
-	)
-
-	return err
-}
-
-// prepareSearchQuery formats a search query for PostgreSQL full-text search
-func prepareSearchQuery(query string) string {
-	// If query contains operators, return as-is
-	if containsSearchOperators(query) {
-		return query
-	}
-	
-	// Split by spaces and handle each word
-	words := strings.Fields(strings.TrimSpace(query))
-	if len(words) == 0 {
-		return ""
-	}
-	
-	// Add prefix matching to each word and join with AND operator
-	var formattedWords []string
-	for _, word := range words {
-		if word != "" {
-			formattedWords = append(formattedWords, word+":*")
-		}
-	}
-	
-	return strings.Join(formattedWords, " & ")
-}
-
-// containsSearchOperators checks if the search query contains PostgreSQL search operators
-func containsSearchOperators(query string) bool {
-	operators := []string{"&", "|", "!", "(", ")", ":", "*"}
-	for _, op := range operators {
-		if strings.Contains(query, op) {
-			return true
-		}
-	}
-	return false
+	totalPages := int(math.Ceil(float64(totalCount) / float64(pageSize)))
+	return totalPages, nil
 }

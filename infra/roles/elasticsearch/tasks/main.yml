@@ -1,0 +1,254 @@
+---
+# Install Java (required for Elasticsearch)
+- name: Install Java 11
+  apt:
+    name: openjdk-11-jdk
+    state: present
+    update_cache: yes
+  become: yes
+
+# Add Elasticsearch GPG key and repository
+- name: Add Elasticsearch GPG key
+  apt_key:
+    url: https://artifacts.elastic.co/GPG-KEY-elasticsearch
+    state: present
+  become: yes
+
+- name: Add Elasticsearch APT repository
+  apt_repository:
+    repo: "deb https://artifacts.elastic.co/packages/{{ elasticsearch_version }}/apt stable main"
+    state: present
+    update_cache: yes
+  become: yes
+
+# Install Elasticsearch
+- name: Install Elasticsearch
+  apt:
+    name: elasticsearch
+    state: present
+    update_cache: yes
+  become: yes
+
+# Create elasticsearch user and group
+- name: Ensure elasticsearch group exists
+  group:
+    name: elasticsearch
+    state: present
+  become: yes
+
+- name: Ensure elasticsearch user exists
+  user:
+    name: elasticsearch
+    group: elasticsearch
+    system: yes
+    shell: /bin/false
+    home: "{{ elasticsearch_data_path }}"
+    createhome: no
+    state: present
+  become: yes
+
+# Create directories
+- name: Create Elasticsearch data directory
+  file:
+    path: "{{ elasticsearch_data_path }}"
+    state: directory
+    owner: elasticsearch
+    group: elasticsearch
+    mode: '0755'
+  become: yes
+
+- name: Create Elasticsearch logs directory
+  file:
+    path: "{{ elasticsearch_logs_path }}"
+    state: directory
+    owner: elasticsearch
+    group: elasticsearch
+    mode: '0755'
+  become: yes
+
+- name: Create Elasticsearch PID directory
+  file:
+    path: "{{ elasticsearch_pid_path }}"
+    state: directory
+    owner: elasticsearch
+    group: elasticsearch
+    mode: '0755'
+  become: yes
+
+# Configure swap and memory settings
+- name: Disable swap for Elasticsearch performance
+  sysctl:
+    name: vm.swappiness
+    value: '1'
+    state: present
+    sysctl_set: yes
+  become: yes
+
+- name: Set vm.max_map_count for Elasticsearch
+  sysctl:
+    name: vm.max_map_count
+    value: '262144'
+    state: present
+    sysctl_set: yes
+  become: yes
+
+# Configure Elasticsearch
+- name: Configure Elasticsearch main settings
+  template:
+    src: elasticsearch.yml.j2
+    dest: /etc/elasticsearch/elasticsearch.yml
+    owner: root
+    group: elasticsearch
+    mode: '0660'
+    backup: yes
+  become: yes
+  notify: restart elasticsearch
+
+- name: Configure JVM options
+  template:
+    src: jvm.options.j2
+    dest: /etc/elasticsearch/jvm.options
+    owner: root
+    group: elasticsearch
+    mode: '0660'
+    backup: yes
+  become: yes
+  notify: restart elasticsearch
+
+# Setup systemd service
+- name: Enable and start Elasticsearch service
+  systemd:
+    name: elasticsearch
+    enabled: "{{ elasticsearch_service_enabled }}"
+    state: "{{ elasticsearch_service_state }}"
+    daemon_reload: yes
+  become: yes
+
+# Wait for Elasticsearch to start
+- name: Wait for Elasticsearch to be ready
+  wait_for:
+    port: "{{ elasticsearch_http_port }}"
+    host: localhost
+    delay: 10
+    timeout: 120
+
+- name: Check Elasticsearch health
+  uri:
+    url: "http://localhost:{{ elasticsearch_http_port }}/_cluster/health"
+    method: GET
+    status_code: 200
+  register: es_health
+  retries: 5
+  delay: 10
+
+# Create data loading directory
+- name: Create data loading directory
+  file:
+    path: "{{ elasticsearch_data_source_dir }}"
+    state: directory
+    mode: '0755'
+  when: elasticsearch_load_events_data
+
+# Install Python packages for data loading
+- name: Install Python pip
+  apt:
+    name: python3-pip
+    state: present
+    update_cache: yes
+  become: yes
+  when: elasticsearch_load_events_data
+
+- name: Install Python Elasticsearch client
+  pip:
+    name:
+      - elasticsearch==8.11.0
+      - requests
+    state: present
+  become: yes
+  when: elasticsearch_load_events_data
+
+# Copy events data files
+- name: Copy events.json to target
+  copy:
+    src: events.json
+    dest: "{{ elasticsearch_data_source_dir }}/events.json"
+    mode: '0644'
+  when: elasticsearch_load_events_data
+
+- name: Copy events_archive.json.zip to target
+  copy:
+    src: events_archive.json.zip
+    dest: "{{ elasticsearch_data_source_dir }}/events_archive.json.zip"
+    mode: '0644'
+  when: elasticsearch_load_events_data
+
+- name: Install unzip package
+  apt:
+    name: unzip
+    state: present
+  become: yes
+  when: elasticsearch_load_events_data
+
+- name: Extract events_archive.json.zip
+  unarchive:
+    src: "{{ elasticsearch_data_source_dir }}/events_archive.json.zip"
+    dest: "{{ elasticsearch_data_source_dir }}"
+    remote_src: yes
+    creates: "{{ elasticsearch_data_source_dir }}/events_archive.json"
+  when: elasticsearch_load_events_data
+
+# Create and run data loading script
+- name: Create events loading script
+  template:
+    src: load_events.py.j2
+    dest: "{{ elasticsearch_data_source_dir }}/load_events.py"
+    mode: '0755'
+  when: elasticsearch_load_events_data
+
+- name: Load events.json data to Elasticsearch
+  command: python3 "{{ elasticsearch_data_source_dir }}/load_events.py" "{{ elasticsearch_data_source_dir }}/events.json" "{{ elasticsearch_events_index }}"
+  register: events_load_result
+  when: elasticsearch_load_events_data
+
+- name: Display events loading results
+  debug:
+    var: events_load_result.stdout_lines
+  when: elasticsearch_load_events_data and events_load_result.stdout_lines is defined
+
+- name: Load events_archive.json data to Elasticsearch
+  command: python3 "{{ elasticsearch_data_source_dir }}/load_events.py" "{{ elasticsearch_data_source_dir }}/events_archive.json" "{{ elasticsearch_events_index }}"
+  register: archive_load_result
+  when: elasticsearch_load_events_data
+
+- name: Display archive loading results
+  debug:
+    var: archive_load_result.stdout_lines
+  when: elasticsearch_load_events_data and archive_load_result.stdout_lines is defined
+
+# Verify data loading
+- name: Check index document count
+  uri:
+    url: "http://localhost:{{ elasticsearch_http_port }}/{{ elasticsearch_events_index }}/_count"
+    method: GET
+  register: doc_count
+  when: elasticsearch_load_events_data
+
+- name: Display document count
+  debug:
+    msg: "Elasticsearch index '{{ elasticsearch_events_index }}' contains {{ doc_count.json.count }} documents"
+  when: elasticsearch_load_events_data and doc_count.json is defined
+
+# Clean up temporary files
+- name: Clean up data loading directory
+  file:
+    path: "{{ elasticsearch_data_source_dir }}"
+    state: absent
+  when: elasticsearch_load_events_data
+
+# Optimize index
+- name: Optimize events index
+  uri:
+    url: "http://localhost:{{ elasticsearch_http_port }}/{{ elasticsearch_events_index }}/_forcemerge?max_num_segments=1"
+    method: POST
+  when: elasticsearch_load_events_data
+  ignore_errors: yes

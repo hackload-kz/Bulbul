@@ -15,6 +15,7 @@ import (
 	"bulbul/internal/messaging"
 	"bulbul/internal/middleware"
 	"bulbul/internal/repository"
+	"bulbul/internal/search"
 	"bulbul/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -26,6 +27,7 @@ type Server struct {
 	router       *gin.Engine
 	config       *config.Config
 	db           *database.DB
+	es           *search.ElasticsearchClient
 	nats         *messaging.NATSClient
 	services     *service.Services
 	repos        *repository.Repositories
@@ -50,6 +52,14 @@ func NewServer(cfg *config.Config) *Server {
 		logger.Fatal("Failed to run migrations", "error", err)
 	}
 
+	// Инициализируем Elasticsearch для событий
+	slog.Info("Connecting to Elasticsearch")
+	esCfg := config.LoadElasticsearchConfig()
+	es, err := search.NewElasticsearchClient(esCfg)
+	if err != nil {
+		logger.Fatal("Failed to connect to Elasticsearch", "error", err, "url", esCfg.URL)
+	}
+
 	// Подключаемся к NATS
 	slog.Info("Connecting to NATS", "url", cfg.NATS.URL)
 	natsClient, err := messaging.NewNATSClient(cfg.NATS)
@@ -61,8 +71,8 @@ func NewServer(cfg *config.Config) *Server {
 	ticketingClient := external.NewTicketingClient(cfg.Ticketing)
 	paymentClient := external.NewPaymentClient(cfg.Payment)
 
-	// Создаем репозитории
-	repos := repository.NewRepositories(db)
+	// Создаем репозитории с Elasticsearch для событий
+	repos := repository.NewRepositoriesWithElasticsearch(db, es)
 
 	// Создаем сервисы
 	services := service.NewServices(repos, natsClient, ticketingClient, paymentClient)
@@ -91,6 +101,7 @@ func NewServer(cfg *config.Config) *Server {
 		router:       router,
 		config:       cfg,
 		db:           db,
+		es:           es,
 		nats:         natsClient,
 		services:     services,
 		repos:        repos,
@@ -116,7 +127,6 @@ func (s *Server) setupRoutes() {
 		// Events endpoints
 		events := api.Group("/events")
 		{
-			events.POST("", h.CreateEvent)
 			events.GET("", h.ListEvents)
 		}
 
@@ -149,6 +159,7 @@ func (s *Server) setupRoutes() {
 	// Health check and monitoring endpoints
 	s.router.GET("/health", s.healthCheck)
 	s.router.GET("/health/db", s.dbHealthCheck)
+	s.router.GET("/health/elasticsearch", s.elasticsearchHealthCheck)
 	s.router.GET("/metrics", gin.WrapH(promhttp.Handler()))
 }
 
@@ -174,6 +185,26 @@ func (s *Server) dbHealthCheck(c *gin.Context) {
 	s.db.ValidateConnectionPool()
 
 	c.JSON(status, healthCheck)
+}
+
+// elasticsearchHealthCheck обрабатывает Elasticsearch health check запросы
+func (s *Server) elasticsearchHealthCheck(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	err := s.es.HealthCheck(ctx)
+
+	if err != nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"status": "unhealthy",
+			"error":  err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "healthy",
+		"service": "elasticsearch",
+	})
 }
 
 // Run запускает HTTP сервер

@@ -11,6 +11,7 @@ resource "local_file" "ansible_inventory" {
     postgres_ip = openstack_networking_port_v2.postgres_port.all_fixed_ips[0]
     valkey_ip   = openstack_networking_port_v2.valkey_port.all_fixed_ips[0]
     monitoring_ip   = openstack_networking_port_v2.monitoring_port.all_fixed_ips[0]
+    elasticsearch_ip   = openstack_networking_port_v2.elasticsearch_port.all_fixed_ips[0]
     monitoring_public_ip = openstack_networking_floatingip_v2.monitoring_fip.address
   })
   filename = "${path.module}/../inventories.ini"

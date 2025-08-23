@@ -26,28 +26,6 @@ func NewHandlers(services *service.Services, valkeyClient *cache.ValkeyClient) *
 
 // Events handlers
 
-// CreateEvent - POST /api/events
-// Создать событие
-func (h *Handlers) CreateEvent(c *gin.Context) {
-	var req models.CreateEventRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	// Логируем полученные данные для отладки
-	slog.Info("Received event request", "title", req.Title, "external", req.External.Bool())
-
-	response, err := h.services.Events.Create(c.Request.Context(), &req)
-	if err != nil {
-		slog.Error("Failed to create event", "error", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create event"})
-		return
-	}
-
-	c.JSON(http.StatusCreated, response)
-}
-
 // ListEvents - GET /api/events
 // Получить список событий
 func (h *Handlers) ListEvents(c *gin.Context) {

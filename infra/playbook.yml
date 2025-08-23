@@ -30,9 +30,6 @@
   hosts: postgres
   become: yes
   gather_facts: yes
-
-  vars:
-    postgresql_load_data: false
   
   roles:
     - postgresql
@@ -46,6 +43,14 @@
   roles:
     - valkey
   tags: valkey
+
+- name: Provision Elasticsearch
+  hosts: elasticsearch
+  become: yes
+  gather_facts: yes
+  roles:
+    - elasticsearch
+  tags: elasticsearch
 
 - name: Deploy API Server
   hosts: api_servers

@@ -1,0 +1,3 @@
+---
+elasticsearch_load_events_data: true
+postgresql_load_data: false

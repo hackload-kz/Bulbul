@@ -16,8 +16,7 @@ run = [
 
 [tasks.load-data]
 run = [
-    "psql -h localhost -p 5432 -U bulbul -d bulbul -f data/users.sql",
-    "psql -h localhost -p 5432 -U bulbul -d bulbul -f data/events.sql"
+    "psql -h localhost -p 5432 -U bulbul -d bulbul -f data/users.sql"
 ]
 
 [tasks.flush-data]

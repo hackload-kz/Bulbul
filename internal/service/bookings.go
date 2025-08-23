@@ -17,14 +17,14 @@ import (
 
 type BookingService struct {
 	bookingRepo     *repository.BookingRepository
-	eventRepo       *repository.EventRepository
+	eventRepo       *repository.EventElasticsearchRepository
 	seatRepo        *repository.SeatRepository
 	paymentClient   *external.PaymentClient
 	ticketingClient *external.TicketingClient
 	natsClient      *messaging.NATSClient
 }
 
-func NewBookingService(bookingRepo *repository.BookingRepository, eventRepo *repository.EventRepository, seatRepo *repository.SeatRepository, paymentClient *external.PaymentClient, ticketingClient *external.TicketingClient, natsClient *messaging.NATSClient) *BookingService {
+func NewBookingService(bookingRepo *repository.BookingRepository, eventRepo *repository.EventElasticsearchRepository, seatRepo *repository.SeatRepository, paymentClient *external.PaymentClient, ticketingClient *external.TicketingClient, natsClient *messaging.NATSClient) *BookingService {
 	return &BookingService{
 		bookingRepo:     bookingRepo,
 		eventRepo:       eventRepo,

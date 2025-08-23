@@ -1,0 +1,53 @@
+---
+# Elasticsearch version
+elasticsearch_version: "8.11"
+
+# Network configuration
+elasticsearch_http_port: 9200
+elasticsearch_transport_port: 9300
+elasticsearch_bind_host: "0.0.0.0"
+
+# Cluster configuration (single node setup)
+elasticsearch_cluster_name: "bulbul-search"
+elasticsearch_node_name: "node-1"
+elasticsearch_discovery_type: "single-node"
+
+# Memory settings (for 16GB RAM node)
+# JVM heap should be 50% of available RAM, max 8GB
+elasticsearch_heap_size: "8g"
+
+# Data paths
+elasticsearch_data_path: "/var/lib/elasticsearch"
+elasticsearch_logs_path: "/var/log/elasticsearch"
+elasticsearch_pid_path: "/var/run/elasticsearch"
+
+# Security settings (disabled as requested)
+elasticsearch_security_enabled: false
+elasticsearch_ssl_enabled: false
+
+# Performance settings
+elasticsearch_thread_pool_write_queue_size: 10000
+elasticsearch_thread_pool_search_queue_size: 10000
+elasticsearch_indices_memory_index_buffer_size: "10%"
+
+# Bootstrap settings
+elasticsearch_bootstrap_memory_lock: true
+
+# Index settings
+elasticsearch_default_shards: 1
+elasticsearch_default_replicas: 0
+
+# Russian language analyzer settings
+elasticsearch_enable_russian_analyzer: true
+
+# Data loading configuration
+elasticsearch_load_events_data: true
+elasticsearch_events_index: "events"
+elasticsearch_data_source_dir: "/tmp/elasticsearch_data"
+
+# Logging
+elasticsearch_log_level: "INFO"
+
+# Service configuration
+elasticsearch_service_enabled: true
+elasticsearch_service_state: "started"

@@ -1,0 +1,21 @@
+meta {
+  name: List events - search by text and date
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{base_url}}/api/events?query=Чемпионат&date=2024-10-15
+  body: none
+  auth: basic
+}
+
+params:query {
+  query: Чемпионат
+  date: 2024-10-15
+}
+
+auth:basic {
+  username: {{default_user_email}}
+  password: {{default_user_password}}
+}

@@ -3,11 +3,21 @@ module bulbul
 go 1.24
 
 require (
+	github.com/elastic/go-elasticsearch/v8 v8.19.0
 	github.com/gin-gonic/gin v1.9.1
 	github.com/google/uuid v1.6.0
 	github.com/lib/pq v1.10.9
 	github.com/nats-io/stan.go v0.10.4
 	github.com/prometheus/client_golang v1.23.0
+)
+
+require (
+	github.com/elastic/elastic-transport-go/v8 v8.7.0 // indirect
+	github.com/go-logr/logr v1.4.2 // indirect
+	github.com/go-logr/stdr v1.2.2 // indirect
+	go.opentelemetry.io/otel v1.28.0 // indirect
+	go.opentelemetry.io/otel/metric v1.28.0 // indirect
+	go.opentelemetry.io/otel/trace v1.28.0 // indirect
 )
 
 require (

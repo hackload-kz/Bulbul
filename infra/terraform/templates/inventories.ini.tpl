@@ -15,6 +15,9 @@ valkey_server ansible_host=${valkey_ip} ansible_user=ubuntu
 [monitoring]
 monitoring_server ansible_host=${monitoring_public_ip} ansible_user=ubuntu
 
+[elasticsearch]
+elasticsearch_server ansible_host=${elasticsearch_ip} ansible_user=ubuntu
+
 [workloads:children]
 api_servers
 
