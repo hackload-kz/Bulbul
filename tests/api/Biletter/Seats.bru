@@ -1,0 +1,16 @@
+meta {
+  name: Seats
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{base_url}}/api/events
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{default_user_email}}
+  password: {{default_user_password}}
+}

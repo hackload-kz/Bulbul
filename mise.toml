@@ -11,7 +11,8 @@ run = "go run cmd/consumers/main.go"
 
 [tasks.build-linux]
 run = [
-    "GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags='-w -s' -o './infra/files/api-server' ./cmd/api"
+    "GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags='-w -s' -o './infra/files/api-server' ./cmd/api",
+    "GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags='-w -s' -o './infra/files/sync-seats' ./cmd/sync-seats"
 ]
 
 [tasks.load-data]

@@ -41,13 +41,6 @@ func (r *SeatRepository) CreateSeatsForEvent(ctx context.Context, eventID int64,
 		}
 	}
 
-	// Update total seats count
-	updateQuery := `UPDATE events_archive SET total_seats = $1 WHERE id = $2`
-	_, err = tx.ExecContext(ctx, updateQuery, rows*seatsPerRow, eventID)
-	if err != nil {
-		return err
-	}
-
 	return tx.Commit()
 }
 
@@ -229,4 +222,69 @@ func (r *SeatRepository) GetBookingBySeatID(ctx context.Context, seatID string) 
 	}
 
 	return booking, err
+}
+
+// DeleteSeatsByEventID deletes all seats for a specific event
+func (r *SeatRepository) DeleteSeatsByEventID(ctx context.Context, eventID int64) error {
+	query := `DELETE FROM seats WHERE event_id = $1`
+	_, err := r.db.ExecContext(ctx, query, eventID)
+	return err
+}
+
+// CreateExternalSeat creates a seat with external ID mapping
+func (r *SeatRepository) CreateExternalSeat(ctx context.Context, seat *models.Seat) error {
+	query := `
+		INSERT INTO seats (id, event_id, row_number, seat_number, status, price)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING id, created_at, updated_at`
+
+	err := r.db.QueryRowContext(ctx, query,
+		seat.ID,
+		seat.EventID,
+		seat.Row,
+		seat.Number,
+		seat.Status,
+		seat.Price,
+	).Scan(&seat.ID, &seat.CreatedAt, &seat.UpdatedAt)
+
+	return err
+}
+
+// BulkCreateSeats efficiently creates multiple seats in a transaction
+func (r *SeatRepository) BulkCreateSeats(ctx context.Context, seats []models.Seat) error {
+	if len(seats) == 0 {
+		return nil
+	}
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Prepare the statement
+	stmt, err := tx.PrepareContext(ctx, `
+		INSERT INTO seats (id, event_id, row_number, seat_number, status, price)
+		VALUES ($1, $2, $3, $4, $5, $6)`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	// Insert seats in batches
+	for _, seat := range seats {
+		_, err = stmt.ExecContext(ctx,
+			seat.ID,
+			seat.EventID,
+			seat.Row,
+			seat.Number,
+			seat.Status,
+			seat.Price,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
 }

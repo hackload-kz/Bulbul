@@ -14,6 +14,7 @@ func (db *DB) RunMigrations() error {
 		createSeatsTable,
 		createBookingsTable,
 		createBookingSeatsTable,
+		migrateSeatsPriceToInt,
 	}
 
 	for i, migration := range migrations {
@@ -59,11 +60,11 @@ const createSeatsTable = `
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TABLE IF NOT EXISTS seats (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    event_id INTEGER NOT NULL REFERENCES events_archive(id) ON DELETE CASCADE,
+    event_id INTEGER NOT NULL,
     row_number INTEGER NOT NULL,
     seat_number INTEGER NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'FREE',
-    price DECIMAL(10,2),
+    price BIGINT,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
     
@@ -74,7 +75,7 @@ CREATE TABLE IF NOT EXISTS seats (
 const createBookingsTable = `
 CREATE TABLE IF NOT EXISTS bookings (
     id SERIAL PRIMARY KEY,
-    event_id INTEGER NOT NULL REFERENCES events_archive(id) ON DELETE CASCADE,
+    event_id INTEGER NOT NULL,
     user_id INTEGER REFERENCES users(user_id),
     status VARCHAR(20) NOT NULL DEFAULT 'CREATED',
     payment_status VARCHAR(20) DEFAULT 'PENDING',
@@ -97,3 +98,19 @@ CREATE TABLE IF NOT EXISTS booking_seats (
     
     UNIQUE(booking_id, seat_id)
 );`
+
+const migrateSeatsPriceToInt = `
+-- Convert price column from DECIMAL to BIGINT for existing data
+DO $$ 
+BEGIN
+    -- Check if price column is DECIMAL type
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'seats' 
+        AND column_name = 'price' 
+        AND data_type = 'numeric'
+    ) THEN
+        -- Convert existing DECIMAL values to BIGINT
+        ALTER TABLE seats ALTER COLUMN price TYPE BIGINT USING (price)::BIGINT;
+    END IF;
+END $$;`

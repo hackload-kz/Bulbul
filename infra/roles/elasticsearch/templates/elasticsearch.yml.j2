@@ -113,9 +113,8 @@ thread_pool.search.queue_size: {{ elasticsearch_thread_pool_search_queue_size }}
 # Memory buffer size for indexing
 indices.memory.index_buffer_size: {{ elasticsearch_indices_memory_index_buffer_size }}
 
-# Default number of shards and replicas for new indices
-index.number_of_shards: {{ elasticsearch_default_shards }}
-index.number_of_replicas: {{ elasticsearch_default_replicas }}
+# Note: Default shard and replica settings are configured per-index during creation
+# index.number_of_shards and index.number_of_replicas are not allowed in node config for ES 8.x
 
 # ---------------------------------- Logging ----------------------------------
 #

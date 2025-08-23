@@ -31,20 +31,6 @@ func NewSeatService(seatRepo *repository.SeatRepository, eventRepo *repository.E
 }
 
 func (s *SeatService) List(ctx context.Context, eventID int64, page, pageSize int, row *int, status *string) ([]models.ListSeatsResponseItem, error) {
-	// If event ID = 1 (external), use ticketing service
-	if eventID == 1 {
-		return s.listExternalSeats(page, pageSize)
-	}
-
-	// Check if event exists and is external
-	event, err := s.eventRepo.GetByID(ctx, eventID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get event: %w", err)
-	}
-	if event == nil {
-		return nil, fmt.Errorf("event not found")
-	}
-
 	// For regular events, use database
 	seats, err := s.seatRepo.GetByEventID(ctx, eventID, page, pageSize, row, status)
 	if err != nil {
@@ -53,9 +39,9 @@ func (s *SeatService) List(ctx context.Context, eventID int64, page, pageSize in
 
 	result := make([]models.ListSeatsResponseItem, len(seats))
 	for i, seat := range seats {
-		price := "0.00"
+		price := "0"
 		if seat.Price != nil {
-			price = fmt.Sprintf("%.2f", float64(*seat.Price)/100.0)
+			price = fmt.Sprintf("%d", *seat.Price)
 		}
 
 		result[i] = models.ListSeatsResponseItem{
@@ -88,7 +74,6 @@ func (s *SeatService) listExternalSeats(page, pageSize int) ([]models.ListSeatsR
 			Row:    int64(place.Row),
 			Number: int64(place.Seat),
 			Status: status,
-			Price:  "50.00", // Default price for external seats
 		}
 	}
 
@@ -140,9 +125,9 @@ func (s *SeatService) Select(ctx context.Context, req *models.SelectSeatRequest)
 
 	if err := s.natsClient.Publish(models.EventSeatSelected, event); err != nil {
 		// Log error but don't fail the operation
-		logger.WithContext(ctx).Error("Failed to publish seat selected event", 
-			"error", err, 
-			"seat_id", req.SeatID, 
+		logger.WithContext(ctx).Error("Failed to publish seat selected event",
+			"error", err,
+			"seat_id", req.SeatID,
 			"booking_id", req.BookingID,
 			"event_type", "seat.selected")
 	}
@@ -185,9 +170,9 @@ func (s *SeatService) selectExternalSeat(ctx context.Context, req *models.Select
 
 	if err := s.natsClient.Publish(models.EventSeatSelected, event); err != nil {
 		// Log error but don't fail the operation
-		logger.WithContext(ctx).Error("Failed to publish seat selected event for external seat", 
-			"error", err, 
-			"seat_id", req.SeatID, 
+		logger.WithContext(ctx).Error("Failed to publish seat selected event for external seat",
+			"error", err,
+			"seat_id", req.SeatID,
 			"booking_id", req.BookingID,
 			"event_type", "seat.selected")
 	}
@@ -225,9 +210,9 @@ func (s *SeatService) Release(ctx context.Context, req *models.ReleaseSeatReques
 
 	if err := s.natsClient.Publish(models.EventSeatReleased, event); err != nil {
 		// Log error but don't fail the operation
-		logger.WithContext(ctx).Error("Failed to publish seat released event", 
-			"error", err, 
-			"seat_id", req.SeatID, 
+		logger.WithContext(ctx).Error("Failed to publish seat released event",
+			"error", err,
+			"seat_id", req.SeatID,
 			"event_id", seat.EventID,
 			"event_type", "seat.released")
 	}
@@ -266,9 +251,9 @@ func (s *SeatService) releaseExternalSeat(ctx context.Context, req *models.Relea
 
 	if err := s.natsClient.Publish(models.EventSeatReleased, event); err != nil {
 		// Log error but don't fail the operation
-		logger.WithContext(ctx).Error("Failed to publish seat released event for external seat", 
-			"error", err, 
-			"seat_id", req.SeatID, 
+		logger.WithContext(ctx).Error("Failed to publish seat released event for external seat",
+			"error", err,
+			"seat_id", req.SeatID,
 			"event_type", "seat.released")
 	}
 

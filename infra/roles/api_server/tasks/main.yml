@@ -35,6 +35,15 @@
     force: true
   notify: restart api-server
 
+- name: Copy sync seats binary
+  copy:
+    src: "files/sync-seats"
+    dest: "{{ sync_seats_binary_path }}"
+    owner: "{{ api_server_user }}"
+    group: "{{ api_server_group }}"
+    mode: '0755'
+    force: true
+
 - name: Create environment file
   template:
     src: api-server.env.j2

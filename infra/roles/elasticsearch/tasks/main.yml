@@ -16,7 +16,7 @@
 
 - name: Add Elasticsearch APT repository
   apt_repository:
-    repo: "deb https://artifacts.elastic.co/packages/{{ elasticsearch_version }}/apt stable main"
+    repo: "deb https://artifacts.elastic.co/packages/{{ elasticsearch_major_version }}.x/apt stable main"
     state: present
     update_cache: yes
   become: yes
@@ -24,7 +24,7 @@
 # Install Elasticsearch
 - name: Install Elasticsearch
   apt:
-    name: elasticsearch
+    name: "elasticsearch={{ elasticsearch_version }}"
     state: present
     update_cache: yes
   become: yes
@@ -54,7 +54,8 @@
     state: directory
     owner: elasticsearch
     group: elasticsearch
-    mode: '0755'
+    mode: '0750'
+    recurse: yes
   become: yes
 
 - name: Create Elasticsearch logs directory
@@ -63,7 +64,8 @@
     state: directory
     owner: elasticsearch
     group: elasticsearch
-    mode: '0755'
+    mode: '0750'
+    recurse: yes
   become: yes
 
 - name: Create Elasticsearch PID directory
@@ -73,6 +75,19 @@
     owner: elasticsearch
     group: elasticsearch
     mode: '0755'
+    recurse: yes
+  become: yes
+
+- name: Ensure elasticsearch owns its directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: elasticsearch
+    group: elasticsearch
+    recurse: yes
+  loop:
+    - "{{ elasticsearch_data_path }}"
+    - "{{ elasticsearch_logs_path }}"
   become: yes
 
 # Configure swap and memory settings
@@ -123,6 +138,15 @@
     state: "{{ elasticsearch_service_state }}"
     daemon_reload: yes
   become: yes
+
+# Force restart after configuration changes
+- name: Force restart Elasticsearch to apply new configuration
+  systemd:
+    name: elasticsearch
+    state: restarted
+    daemon_reload: yes
+  become: yes
+  when: elasticsearch_service_enabled
 
 # Wait for Elasticsearch to start
 - name: Wait for Elasticsearch to be ready
@@ -252,3 +276,94 @@
     method: POST
   when: elasticsearch_load_events_data
   ignore_errors: yes
+
+# Install and configure Elasticsearch Exporter for monitoring
+- name: Create elasticsearch exporter user
+  user:
+    name: "{{ elasticsearch_exporter_user }}"
+    group: "{{ elasticsearch_exporter_group }}"
+    system: yes
+    shell: /bin/false
+    home: /var/lib/elasticsearch_exporter
+    createhome: no
+    state: present
+  become: yes
+  when: elasticsearch_exporter_enabled
+
+- name: Create elasticsearch exporter group
+  group:
+    name: "{{ elasticsearch_exporter_group }}"
+    state: present
+  become: yes
+  when: elasticsearch_exporter_enabled
+
+- name: Create elasticsearch exporter directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ elasticsearch_exporter_user }}"
+    group: "{{ elasticsearch_exporter_group }}"
+    mode: '0755'
+  loop:
+    - /var/lib/elasticsearch_exporter
+    - /var/log/elasticsearch_exporter
+  become: yes
+  when: elasticsearch_exporter_enabled
+
+- name: Download Elasticsearch Exporter
+  get_url:
+    url: "https://github.com/prometheus-community/elasticsearch_exporter/releases/download/v{{ elasticsearch_exporter_version }}/elasticsearch_exporter-{{ elasticsearch_exporter_version }}.linux-amd64.tar.gz"
+    dest: "/tmp/elasticsearch_exporter-{{ elasticsearch_exporter_version }}.linux-amd64.tar.gz"
+    mode: '0644'
+  become: yes
+  when: elasticsearch_exporter_enabled
+
+- name: Extract Elasticsearch Exporter
+  unarchive:
+    src: "/tmp/elasticsearch_exporter-{{ elasticsearch_exporter_version }}.linux-amd64.tar.gz"
+    dest: /tmp
+    remote_src: yes
+    creates: "/tmp/elasticsearch_exporter-{{ elasticsearch_exporter_version }}.linux-amd64"
+  become: yes
+  when: elasticsearch_exporter_enabled
+
+- name: Install Elasticsearch Exporter binary
+  copy:
+    src: "/tmp/elasticsearch_exporter-{{ elasticsearch_exporter_version }}.linux-amd64/elasticsearch_exporter"
+    dest: /usr/local/bin/elasticsearch_exporter
+    mode: '0755'
+    owner: root
+    group: root
+    remote_src: yes
+  become: yes
+  when: elasticsearch_exporter_enabled
+
+- name: Create Elasticsearch Exporter systemd service
+  template:
+    src: elasticsearch_exporter.service.j2
+    dest: /etc/systemd/system/elasticsearch_exporter.service
+    owner: root
+    group: root
+    mode: '0644'
+  become: yes
+  notify: restart elasticsearch_exporter
+  when: elasticsearch_exporter_enabled
+
+- name: Enable and start Elasticsearch Exporter
+  systemd:
+    name: elasticsearch_exporter
+    enabled: yes
+    state: started
+    daemon_reload: yes
+  become: yes
+  when: elasticsearch_exporter_enabled
+
+- name: Clean up temporary files
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "/tmp/elasticsearch_exporter-{{ elasticsearch_exporter_version }}.linux-amd64.tar.gz"
+    - "/tmp/elasticsearch_exporter-{{ elasticsearch_exporter_version }}.linux-amd64"
+  become: yes
+  when: elasticsearch_exporter_enabled

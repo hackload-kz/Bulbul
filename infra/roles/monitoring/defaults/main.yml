@@ -48,8 +48,12 @@ node_exporter_port: 9100
 # Application ports
 api_server_port: 8081
 
+# Monitoring ports
+elasticsearch_exporter_port: 9114
+
 # Server groups for scraping
 load_balancer_hosts: "{{ groups['load_balancer'] | default([]) }}"
 api_server_hosts: "{{ groups['api_servers'] | default([]) }}"
 postgres_hosts: "{{ groups['postgres'] | default([]) }}"
 valkey_hosts: "{{ groups['valkey'] | default([]) }}"
+elasticsearch_hosts: "{{ groups['elasticsearch'] | default([]) }}"

@@ -6,6 +6,7 @@ api_server_user: "bulbul"
 api_server_group: "bulbul"
 api_server_home: "/opt/bulbul"
 api_server_binary_path: "{{ api_server_home }}/api-server"
+sync_seats_binary_path: "{{ api_server_home }}/sync-seats"
 api_server_config_dir: "/etc/bulbul"
 
 # Go configuration
