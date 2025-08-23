@@ -1,7 +1,7 @@
 ---
 # Elasticsearch version
 elasticsearch_major_version: "8"
-elasticsearch_version: "8.11.0"
+elasticsearch_version: "8.19.2"
 
 # Network configuration
 elasticsearch_http_port: 9200

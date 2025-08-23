@@ -70,6 +70,7 @@ scrape_configs:
 {% endfor %}
     scrape_interval: {{ scrape_interval }}
     metrics_path: /metrics
+{% endif %}
 
   # Bulbul Application metrics
 {% if api_server_hosts %}
