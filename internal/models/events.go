@@ -11,6 +11,7 @@ const (
 	EventSeatSelected      = "seat.selected"
 	EventSeatReleased      = "seat.released"
 	EventBookingCancelled  = "booking.cancelled"
+	EventBookingExpired    = "booking.expired"
 )
 
 // BookingCreatedEvent represents a booking creation event
@@ -68,5 +69,14 @@ type BookingCancelledEvent struct {
 	BookingID int64     `json:"booking_id"`
 	EventID   int64     `json:"event_id"`
 	Reason    string    `json:"reason"`
+	Timestamp time.Time `json:"timestamp"`
+}
+
+// BookingExpiredEvent represents a booking expiration event (15-minute timeout)
+type BookingExpiredEvent struct {
+	BookingID int64     `json:"booking_id"`
+	EventID   int64     `json:"event_id"`
+	Reason    string    `json:"reason"`
+	UserID    *int64    `json:"user_id"`
 	Timestamp time.Time `json:"timestamp"`
 }

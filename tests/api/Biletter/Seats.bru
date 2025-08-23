@@ -5,9 +5,15 @@ meta {
 }
 
 get {
-  url: {{base_url}}/api/events
+  url: {{base_url}}/api/seats?event_id=1&pageSize=20&page=2
   body: none
   auth: basic
+}
+
+params:query {
+  event_id: 1
+  pageSize: 20
+  page: 2
 }
 
 auth:basic {

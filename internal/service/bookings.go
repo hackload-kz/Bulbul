@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"bulbul/internal/errors"
 	"bulbul/internal/external"
 	"bulbul/internal/logger"
 	"bulbul/internal/messaging"
@@ -58,38 +59,9 @@ func (s *BookingService) Create(ctx context.Context, req *models.CreateBookingRe
 		booking.UserID = &id
 	}
 
-	// For external events (event ID = 1), start order with ticketing service
-	if req.EventID == 1 {
-		startOrderResp, err := s.ticketingClient.StartOrder()
-		if err != nil {
-			return nil, fmt.Errorf("failed to start external order: %w", err)
-		}
-
-		// Set the external order ID
-		booking.OrderID = &startOrderResp.OrderID
-		booking.Status = "CONFIRMED"        // External bookings are confirmed immediately
-		booking.PaymentStatus = "COMPLETED" // No payment needed for external events
-	}
-
 	err = s.bookingRepo.Create(ctx, booking)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create booking: %w", err)
-	}
-
-	// Publish booking created event
-	event_data := models.BookingCreatedEvent{
-		BookingID: booking.ID,
-		EventID:   booking.EventID,
-		UserID:    booking.UserID,
-		Timestamp: time.Now(),
-	}
-
-	if err := s.natsClient.Publish(models.EventBookingCreated, event_data); err != nil {
-		// Log error but don't fail the operation
-		logger.WithContext(ctx).Error("Failed to publish booking created event",
-			"error", err,
-			"booking_id", booking.ID,
-			"event_type", "booking.created")
 	}
 
 	return &models.CreateBookingResponse{ID: booking.ID}, nil
@@ -122,6 +94,15 @@ func (s *BookingService) InitiatePayment(ctx context.Context, req *models.Initia
 		return "", fmt.Errorf("booking not found")
 	}
 
+	// Authorization: verify user owns this booking
+	if userID, ok := middleware.UserIDFromContext(ctx); ok {
+		if booking.UserID == nil || *booking.UserID != userID {
+			return "", errors.ErrForbidden
+		}
+	} else {
+		return "", errors.ErrUnauthorized
+	}
+
 	// Get booking seats to calculate total amount
 	seats, err := s.bookingRepo.GetSeats(ctx, booking.ID)
 	if err != nil {
@@ -140,62 +121,29 @@ func (s *BookingService) InitiatePayment(ctx context.Context, req *models.Initia
 		}
 	}
 
-	// Only use payment service for non-external events (ID != 1)
-	if booking.EventID != 1 {
-		// Generate unique order ID
-		orderID := uuid.New().String()
+	// Generate unique order ID
+	orderID := uuid.New().String()
 
-		// Initialize payment
-		paymentResp, err := s.paymentClient.InitPayment(totalAmount, orderID, "RUB", "Билет на мероприятие")
-		if err != nil {
-			return "", fmt.Errorf("failed to initialize payment: %w", err)
-		}
-
-		// Update booking with payment info
-		booking.PaymentStatus = "INITIATED"
-		booking.PaymentID = &paymentResp.PaymentID
-		booking.OrderID = &orderID
-		totalAmountStr := fmt.Sprintf("%d", totalAmount)
-		booking.TotalAmount = &totalAmountStr
-
-		err = s.bookingRepo.Update(ctx, booking)
-		if err != nil {
-			return "", fmt.Errorf("failed to update booking: %w", err)
-		}
-
-		// Publish payment initiated event
-		event := models.PaymentInitiatedEvent{
-			BookingID:   booking.ID,
-			EventID:     booking.EventID,
-			TotalAmount: totalAmount,
-			PaymentID:   paymentResp.PaymentID,
-			Timestamp:   time.Now(),
-		}
-
-		if err := s.natsClient.Publish(models.EventPaymentInitiated, event); err != nil {
-			// Log error but don't fail the operation
-			logger.WithContext(ctx).Error("Failed to publish payment initiated event",
-				"error", err,
-				"event_type", "payment.initiated")
-		}
-
-		// Return payment URL
-		return paymentResp.PaymentURL, nil
-	} else {
-		// For external events (ID=1), just mark as payment not required
-		booking.PaymentStatus = "COMPLETED"
-		booking.Status = "CONFIRMED"
-		totalAmountStr := fmt.Sprintf("%d", totalAmount)
-		booking.TotalAmount = &totalAmountStr
-
-		err = s.bookingRepo.Update(ctx, booking)
-		if err != nil {
-			return "", fmt.Errorf("failed to update booking: %w", err)
-		}
-
-		// For external events, return empty URL since no payment is needed
-		return "", nil
+	// Initialize payment for all events (including event_id=1)
+	paymentResp, err := s.paymentClient.InitPayment(totalAmount, orderID, "RUB", "Билет на мероприятие")
+	if err != nil {
+		return "", fmt.Errorf("failed to initialize payment: %w", err)
 	}
+
+	// Update booking with payment info
+	booking.PaymentStatus = "INITIATED"
+	booking.PaymentID = &paymentResp.PaymentID
+	booking.OrderID = &orderID
+	totalAmountStr := fmt.Sprintf("%d", totalAmount)
+	booking.TotalAmount = &totalAmountStr
+
+	err = s.bookingRepo.Update(ctx, booking)
+	if err != nil {
+		return "", fmt.Errorf("failed to update booking: %w", err)
+	}
+
+	// Return payment URL
+	return paymentResp.PaymentURL, nil
 }
 
 func (s *BookingService) Cancel(ctx context.Context, req *models.CancelBookingRequest) error {
@@ -206,6 +154,15 @@ func (s *BookingService) Cancel(ctx context.Context, req *models.CancelBookingRe
 	}
 	if booking == nil {
 		return fmt.Errorf("booking not found")
+	}
+
+	// Authorization: verify user owns this booking
+	if userID, ok := middleware.UserIDFromContext(ctx); ok {
+		if booking.UserID == nil || *booking.UserID != userID {
+			return errors.ErrForbidden
+		}
+	} else {
+		return errors.ErrUnauthorized
 	}
 
 	// Release all seats
@@ -240,21 +197,6 @@ func (s *BookingService) Cancel(ctx context.Context, req *models.CancelBookingRe
 	err = s.bookingRepo.Update(ctx, booking)
 	if err != nil {
 		return fmt.Errorf("failed to update booking: %w", err)
-	}
-
-	// Publish booking cancelled event
-	event := models.BookingCancelledEvent{
-		BookingID: booking.ID,
-		EventID:   booking.EventID,
-		Reason:    "User cancellation",
-		Timestamp: time.Now(),
-	}
-
-	if err := s.natsClient.Publish(models.EventBookingCancelled, event); err != nil {
-		// Log error but don't fail the operation
-		logger.WithContext(ctx).Error("Failed to publish booking cancelled event",
-			"error", err,
-			"event_type", "booking.cancelled")
 	}
 
 	return nil

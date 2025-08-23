@@ -61,3 +61,6 @@ service_timeout_sec: "30"
 
 # Logging
 log_file: "/var/log/{{ api_server_service_name }}.log"
+
+# Elastic
+elasticsearch_host: "{{ hostvars[groups['elasticsearch'][0]]['ansible_host'] }}"

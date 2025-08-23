@@ -1,0 +1,23 @@
+meta {
+  name: Seats select
+  type: http
+  seq: 9
+}
+
+patch {
+  url: {{base_url}}/api/seats/select
+  body: json
+  auth: basic
+}
+
+auth:basic {
+  username: {{default_user_email}}
+  password: {{default_user_password}}
+}
+
+body:json {
+  {
+    "booking_id": 2,
+    "seat_id": "4eba76de-4288-4b39-b65d-531efdc2fc62"
+  }
+}

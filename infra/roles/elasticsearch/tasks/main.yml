@@ -187,7 +187,9 @@
     name:
       - elasticsearch==8.11.0
       - requests
+      - ijson
     state: present
+    break_system_packages: true
   become: yes
   when: elasticsearch_load_events_data
 
@@ -221,11 +223,18 @@
     creates: "{{ elasticsearch_data_source_dir }}/events_archive.json"
   when: elasticsearch_load_events_data
 
-# Create and run data loading script
+# Create and run data loading scripts
 - name: Create events loading script
   template:
     src: load_events.py.j2
     dest: "{{ elasticsearch_data_source_dir }}/load_events.py"
+    mode: '0755'
+  when: elasticsearch_load_events_data
+
+- name: Create batch events loading script
+  template:
+    src: load_events_batch.py.j2
+    dest: "{{ elasticsearch_data_source_dir }}/load_events_batch.py"
     mode: '0755'
   when: elasticsearch_load_events_data
 
@@ -239,9 +248,10 @@
     var: events_load_result.stdout_lines
   when: elasticsearch_load_events_data and events_load_result.stdout_lines is defined
 
-- name: Load events_archive.json data to Elasticsearch
-  command: python3 "{{ elasticsearch_data_source_dir }}/load_events.py" "{{ elasticsearch_data_source_dir }}/events_archive.json" "{{ elasticsearch_events_index }}"
+- name: Load events_archive.json data to Elasticsearch (batch processing)
+  command: python3 "{{ elasticsearch_data_source_dir }}/load_events_batch.py" "{{ elasticsearch_data_source_dir }}/events_archive.json" "{{ elasticsearch_events_index }}"
   register: archive_load_result
+  timeout: 3600  # 1 hour timeout for large file processing
   when: elasticsearch_load_events_data
 
 - name: Display archive loading results
@@ -276,94 +286,3 @@
     method: POST
   when: elasticsearch_load_events_data
   ignore_errors: yes
-
-# Install and configure Elasticsearch Exporter for monitoring
-- name: Create elasticsearch exporter user
-  user:
-    name: "{{ elasticsearch_exporter_user }}"
-    group: "{{ elasticsearch_exporter_group }}"
-    system: yes
-    shell: /bin/false
-    home: /var/lib/elasticsearch_exporter
-    createhome: no
-    state: present
-  become: yes
-  when: elasticsearch_exporter_enabled
-
-- name: Create elasticsearch exporter group
-  group:
-    name: "{{ elasticsearch_exporter_group }}"
-    state: present
-  become: yes
-  when: elasticsearch_exporter_enabled
-
-- name: Create elasticsearch exporter directories
-  file:
-    path: "{{ item }}"
-    state: directory
-    owner: "{{ elasticsearch_exporter_user }}"
-    group: "{{ elasticsearch_exporter_group }}"
-    mode: '0755'
-  loop:
-    - /var/lib/elasticsearch_exporter
-    - /var/log/elasticsearch_exporter
-  become: yes
-  when: elasticsearch_exporter_enabled
-
-- name: Download Elasticsearch Exporter
-  get_url:
-    url: "https://github.com/prometheus-community/elasticsearch_exporter/releases/download/v{{ elasticsearch_exporter_version }}/elasticsearch_exporter-{{ elasticsearch_exporter_version }}.linux-amd64.tar.gz"
-    dest: "/tmp/elasticsearch_exporter-{{ elasticsearch_exporter_version }}.linux-amd64.tar.gz"
-    mode: '0644'
-  become: yes
-  when: elasticsearch_exporter_enabled
-
-- name: Extract Elasticsearch Exporter
-  unarchive:
-    src: "/tmp/elasticsearch_exporter-{{ elasticsearch_exporter_version }}.linux-amd64.tar.gz"
-    dest: /tmp
-    remote_src: yes
-    creates: "/tmp/elasticsearch_exporter-{{ elasticsearch_exporter_version }}.linux-amd64"
-  become: yes
-  when: elasticsearch_exporter_enabled
-
-- name: Install Elasticsearch Exporter binary
-  copy:
-    src: "/tmp/elasticsearch_exporter-{{ elasticsearch_exporter_version }}.linux-amd64/elasticsearch_exporter"
-    dest: /usr/local/bin/elasticsearch_exporter
-    mode: '0755'
-    owner: root
-    group: root
-    remote_src: yes
-  become: yes
-  when: elasticsearch_exporter_enabled
-
-- name: Create Elasticsearch Exporter systemd service
-  template:
-    src: elasticsearch_exporter.service.j2
-    dest: /etc/systemd/system/elasticsearch_exporter.service
-    owner: root
-    group: root
-    mode: '0644'
-  become: yes
-  notify: restart elasticsearch_exporter
-  when: elasticsearch_exporter_enabled
-
-- name: Enable and start Elasticsearch Exporter
-  systemd:
-    name: elasticsearch_exporter
-    enabled: yes
-    state: started
-    daemon_reload: yes
-  become: yes
-  when: elasticsearch_exporter_enabled
-
-- name: Clean up temporary files
-  file:
-    path: "{{ item }}"
-    state: absent
-  loop:
-    - "/tmp/elasticsearch_exporter-{{ elasticsearch_exporter_version }}.linux-amd64.tar.gz"
-    - "/tmp/elasticsearch_exporter-{{ elasticsearch_exporter_version }}.linux-amd64"
-  become: yes
-  when: elasticsearch_exporter_enabled

@@ -44,6 +44,14 @@
     mode: '0755'
     force: true
 
+- name: Copy sync seats script
+  template:
+    src: "sync-seats.sh.j2"
+    dest: "{{ api_server_home }}/sync-seats.sh"
+    owner: "{{ api_server_user }}"
+    group: "{{ api_server_group }}"
+    mode: '0755'
+
 - name: Create environment file
   template:
     src: api-server.env.j2

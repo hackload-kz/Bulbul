@@ -1,0 +1,300 @@
+#!/usr/bin/env python3
+"""
+Elasticsearch Events Batch Data Loader Template
+Loads large JSON files into Elasticsearch using streaming processing to avoid memory exhaustion
+Processes events in batches to prevent system resource consumption
+"""
+
+import json
+import os
+import sys
+import time
+import gc
+from datetime import datetime
+from elasticsearch import Elasticsearch, helpers
+import ijson
+
+def main():
+    if len(sys.argv) < 3:
+        print("Usage: python3 load_events_batch.py <json_file> <index_name>")
+        sys.exit(1)
+    
+    json_file = sys.argv[1]
+    index_name = sys.argv[2]
+    
+    # Configuration
+    elasticsearch_url = 'http://localhost:{{ elasticsearch_http_port }}'
+    batch_size = 50000  # Process 50,000 records at a time
+    chunk_size = 1000   # Elasticsearch bulk size
+
+    print(f"Starting Elasticsearch batch events loader...")
+    print(f"Elasticsearch URL: {elasticsearch_url}")
+    print(f"Index: {index_name}")
+    print(f"JSON file: {json_file}")
+    print(f"Batch size: {batch_size:,} records")
+    print(f"Elasticsearch chunk size: {chunk_size}")
+
+    # Initialize Elasticsearch client
+    try:
+        es = Elasticsearch(
+            [elasticsearch_url],
+            verify_certs=False,
+            ssl_show_warn=False,
+            request_timeout=60,
+            max_retries=3,
+            retry_on_timeout=True
+        )
+        
+        # Check connection
+        if not es.ping():
+            print("ERROR: Cannot connect to Elasticsearch")
+            sys.exit(1)
+            
+        print("✓ Connected to Elasticsearch")
+    except Exception as e:
+        print(f"ERROR: Failed to connect to Elasticsearch: {e}")
+        sys.exit(1)
+
+    # Wait for Elasticsearch to be fully ready
+    print("Waiting for Elasticsearch cluster to be ready...")
+    for attempt in range(30):
+        try:
+            health = es.cluster.health(wait_for_status='yellow', timeout='10s')
+            if health['status'] in ['yellow', 'green']:
+                print(f"✓ Elasticsearch cluster is {health['status']}")
+                break
+        except Exception as e:
+            print(f"Attempt {attempt + 1}/30: Waiting for cluster health... ({e})")
+            time.sleep(2)
+    else:
+        print("ERROR: Elasticsearch cluster not ready")
+        sys.exit(1)
+
+    # Create index with Russian analyzer if it doesn't exist
+    index_settings = {
+        "settings": {
+            "number_of_shards": {{ elasticsearch_default_shards }},
+            "number_of_replicas": {{ elasticsearch_default_replicas }},
+            "analysis": {
+                "analyzer": {
+                    "russian_analyzer": {
+                        "type": "custom",
+                        "tokenizer": "standard",
+                        "filter": ["lowercase", "russian_stop", "russian_stemmer"]
+                    }
+                },
+                "filter": {
+                    "russian_stop": {
+                        "type": "stop",
+                        "stopwords": "_russian_"
+                    },
+                    "russian_stemmer": {
+                        "type": "stemmer",
+                        "language": "russian"
+                    }
+                }
+            }
+        },
+        "mappings": {
+            "properties": {
+                "id": {"type": "long"},
+                "title": {
+                    "type": "text",
+                    "analyzer": "russian_analyzer",
+                    "fields": {
+                        "keyword": {
+                            "type": "keyword",
+                            "ignore_above": 256
+                        }
+                    }
+                },
+                "description": {
+                    "type": "text",
+                    "analyzer": "russian_analyzer"
+                },
+                "type": {"type": "keyword"},
+                "datetime_start": {
+                    "type": "date",
+                    "format": "strict_date_optional_time||epoch_millis"
+                },
+                "provider": {"type": "keyword"},
+                "external": {"type": "boolean"},
+                "total_seats": {"type": "integer"},
+                "created_at": {"type": "date"},
+                "updated_at": {"type": "date"}
+            }
+        }
+    }
+
+    try:
+        if not es.indices.exists(index=index_name):
+            print(f"Creating index: {index_name}")
+            es.indices.create(index=index_name, body=index_settings)
+            print("✓ Index created successfully")
+        else:
+            print(f"✓ Index {index_name} already exists")
+    except Exception as e:
+        print(f"ERROR: Failed to create index: {e}")
+        sys.exit(1)
+
+    # Check if file exists
+    if not os.path.exists(json_file):
+        print(f"ERROR: JSON file not found: {json_file}")
+        sys.exit(1)
+
+    print(f"Starting streaming processing of large JSON file...")
+    
+    # Statistics
+    total_success = 0
+    total_errors = 0
+    batch_number = 0
+    start_time = time.time()
+
+    try:
+        # Open file for streaming
+        with open(json_file, 'rb') as f:
+            # Use ijson to parse the array incrementally
+            parser = ijson.items(f, 'item')
+            
+            batch = []
+            
+            for event in parser:
+                # Process each event
+                try:
+                    # Convert datetime strings to proper format
+                    if 'datetime_start' in event and isinstance(event['datetime_start'], str):
+                        try:
+                            # Try parsing different datetime formats
+                            dt = None
+                            for fmt in ['%Y-%m-%d %H:%M:%S', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%dT%H:%M:%SZ']:
+                                try:
+                                    dt = datetime.strptime(event['datetime_start'], fmt)
+                                    break
+                                except ValueError:
+                                    continue
+                            
+                            if dt:
+                                event['datetime_start'] = dt.strftime('%Y-%m-%dT%H:%M:%SZ')
+                        except Exception as e:
+                            print(f"Warning: Failed to parse datetime for event {event.get('id', 'unknown')}: {e}")
+                    
+                    # Add created_at and updated_at timestamps
+                    now = datetime.now().isoformat()
+                    if 'created_at' not in event or not event['created_at']:
+                        event['created_at'] = now
+                    if 'updated_at' not in event or not event['updated_at']:
+                        event['updated_at'] = now
+                    
+                    # Prepare document for Elasticsearch
+                    doc = {
+                        "_index": index_name,
+                        "_id": str(event['id']),
+                        "_source": event
+                    }
+                    
+                    batch.append(doc)
+                    
+                except Exception as e:
+                    print(f"Warning: Failed to process event: {e}")
+                    total_errors += 1
+                    continue
+                
+                # Process batch when it reaches the batch size
+                if len(batch) >= batch_size:
+                    batch_number += 1
+                    success_count, error_count = process_batch(es, batch, batch_number, chunk_size)
+                    total_success += success_count
+                    total_errors += error_count
+                    
+                    batch = []  # Clear batch
+                    gc.collect()  # Force garbage collection
+                    
+                    # Brief pause to allow system resources to recover
+                    time.sleep(0.1)
+            
+            # Process remaining events in the last batch
+            if batch:
+                batch_number += 1
+                success_count, error_count = process_batch(es, batch, batch_number, chunk_size)
+                total_success += success_count
+                total_errors += error_count
+
+    except Exception as e:
+        print(f"ERROR: Failed to process JSON file: {e}")
+        sys.exit(1)
+
+    total_time = time.time() - start_time
+    
+    print(f"\n=== Batch Processing Summary ===")
+    print(f"Total batches processed: {batch_number}")
+    print(f"Total events processed: {total_success + total_errors:,}")
+    print(f"Successfully indexed: {total_success:,}")
+    print(f"Errors: {total_errors:,}")
+    print(f"Total processing time: {total_time:.2f} seconds")
+    if total_time > 0:
+        print(f"Average rate: {(total_success + total_errors) / total_time:.1f} documents/second")
+    
+    if total_errors > 0:
+        print(f"WARNING: {total_errors:,} events failed to index")
+
+    # Refresh index to make documents searchable immediately
+    try:
+        print("Refreshing index...")
+        es.indices.refresh(index=index_name)
+        print("✓ Index refreshed")
+    except Exception as e:
+        print(f"Warning: Failed to refresh index: {e}")
+
+    # Verify indexing
+    try:
+        print("Verifying indexing...")
+        doc_count = es.count(index=index_name)['count']
+        print(f"✓ Index contains {doc_count:,} documents")
+        
+        if doc_count >= total_success:
+            print("✓ All documents indexed successfully!")
+        else:
+            print(f"WARNING: Expected at least {total_success:,} documents, but found {doc_count:,}")
+            
+    except Exception as e:
+        print(f"Warning: Failed to verify indexing: {e}")
+
+    print(f"\n🎉 Batch processing of {json_file} completed successfully!")
+
+def process_batch(es, batch, batch_number, chunk_size):
+    """Process a batch of documents"""
+    print(f"Processing batch {batch_number} with {len(batch):,} records...")
+    
+    batch_start_time = time.time()
+    success_count = 0
+    error_count = 0
+    
+    try:
+        # Use bulk helper for efficient indexing
+        for success, info in helpers.parallel_bulk(
+            es,
+            batch,
+            chunk_size=chunk_size,
+            thread_count=2,
+            request_timeout=120  # Longer timeout for large batches
+        ):
+            if success:
+                success_count += 1
+            else:
+                error_count += 1
+                print(f"Indexing error: {info}")
+
+        batch_time = time.time() - batch_start_time
+        rate = len(batch) / batch_time if batch_time > 0 else 0
+        
+        print(f"✓ Batch {batch_number} completed: {success_count:,} success, {error_count:,} errors")
+        print(f"  Batch processing time: {batch_time:.2f}s, Rate: {rate:.1f} docs/sec")
+        
+    except Exception as e:
+        print(f"ERROR: Batch {batch_number} failed: {e}")
+        error_count = len(batch)
+    
+    return success_count, error_count
+
+if __name__ == "__main__":
+    main()

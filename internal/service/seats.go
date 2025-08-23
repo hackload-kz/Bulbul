@@ -3,11 +3,10 @@ package service
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"bulbul/internal/external"
-	"bulbul/internal/logger"
 	"bulbul/internal/messaging"
+	"bulbul/internal/middleware"
 	"bulbul/internal/models"
 	"bulbul/internal/repository"
 )
@@ -31,7 +30,7 @@ func NewSeatService(seatRepo *repository.SeatRepository, eventRepo *repository.E
 }
 
 func (s *SeatService) List(ctx context.Context, eventID int64, page, pageSize int, row *int, status *string) ([]models.ListSeatsResponseItem, error) {
-	// For regular events, use database
+	// All events (including event_id=1) use local database
 	seats, err := s.seatRepo.GetByEventID(ctx, eventID, page, pageSize, row, status)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get seats: %w", err)
@@ -56,30 +55,6 @@ func (s *SeatService) List(ctx context.Context, eventID int64, page, pageSize in
 	return result, nil
 }
 
-func (s *SeatService) listExternalSeats(page, pageSize int) ([]models.ListSeatsResponseItem, error) {
-	places, err := s.ticketingClient.GetPlaces(page, pageSize)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get external places: %w", err)
-	}
-
-	result := make([]models.ListSeatsResponseItem, len(places))
-	for i, place := range places {
-		status := "FREE"
-		if !place.IsFree {
-			status = "RESERVED"
-		}
-
-		result[i] = models.ListSeatsResponseItem{
-			ID:     place.ID,
-			Row:    int64(place.Row),
-			Number: int64(place.Seat),
-			Status: status,
-		}
-	}
-
-	return result, nil
-}
-
 func (s *SeatService) Select(ctx context.Context, req *models.SelectSeatRequest) error {
 	// First, get the booking to determine the event
 	booking, err := s.getBookingByID(ctx, req.BookingID)
@@ -90,12 +65,16 @@ func (s *SeatService) Select(ctx context.Context, req *models.SelectSeatRequest)
 		return fmt.Errorf("booking not found")
 	}
 
-	// If event ID = 1 (external), use ticketing service directly
-	if booking.EventID == 1 {
-		return s.selectExternalSeat(ctx, req)
+	// Authorization: verify user owns this booking
+	if userID, ok := middleware.UserIDFromContext(ctx); ok {
+		if booking.UserID == nil || *booking.UserID != userID {
+			return fmt.Errorf("unauthorized: booking does not belong to current user")
+		}
+	} else {
+		return fmt.Errorf("unauthorized: user not authenticated")
 	}
 
-	// For regular events, get seat to verify it exists
+	// Get seat to verify it exists (all events use local database)
 	seat, err := s.seatRepo.GetByID(ctx, req.SeatID)
 	if err != nil {
 		return fmt.Errorf("failed to get seat: %w", err)
@@ -115,68 +94,6 @@ func (s *SeatService) Select(ctx context.Context, req *models.SelectSeatRequest)
 		return fmt.Errorf("failed to reserve seat: %w", err)
 	}
 
-	// Publish seat selected event
-	event := models.SeatSelectedEvent{
-		BookingID: req.BookingID,
-		SeatID:    req.SeatID,
-		EventID:   seat.EventID,
-		Timestamp: time.Now(),
-	}
-
-	if err := s.natsClient.Publish(models.EventSeatSelected, event); err != nil {
-		// Log error but don't fail the operation
-		logger.WithContext(ctx).Error("Failed to publish seat selected event",
-			"error", err,
-			"seat_id", req.SeatID,
-			"booking_id", req.BookingID,
-			"event_type", "seat.selected")
-	}
-
-	return nil
-}
-
-func (s *SeatService) selectExternalSeat(ctx context.Context, req *models.SelectSeatRequest) error {
-	// For external seats, we need to map seat ID to place ID
-	// This is simplified - in real implementation we'd need proper mapping
-	placeID := req.SeatID // SeatID is already a string
-
-	// Get the booking to get the external order ID
-	booking, err := s.getBookingByID(ctx, req.BookingID)
-	if err != nil {
-		return fmt.Errorf("failed to get booking: %w", err)
-	}
-	if booking == nil {
-		return fmt.Errorf("booking not found")
-	}
-
-	if booking.OrderID == nil {
-		return fmt.Errorf("external booking must have order ID")
-	}
-
-	orderID := *booking.OrderID
-
-	err = s.ticketingClient.SelectPlace(placeID, orderID)
-	if err != nil {
-		return fmt.Errorf("failed to select external place: %w", err)
-	}
-
-	// Publish seat selected event
-	event := models.SeatSelectedEvent{
-		BookingID: req.BookingID,
-		SeatID:    req.SeatID,
-		EventID:   1, // External event
-		Timestamp: time.Now(),
-	}
-
-	if err := s.natsClient.Publish(models.EventSeatSelected, event); err != nil {
-		// Log error but don't fail the operation
-		logger.WithContext(ctx).Error("Failed to publish seat selected event for external seat",
-			"error", err,
-			"seat_id", req.SeatID,
-			"booking_id", req.BookingID,
-			"event_type", "seat.selected")
-	}
-
 	return nil
 }
 
@@ -190,38 +107,7 @@ func (s *SeatService) Release(ctx context.Context, req *models.ReleaseSeatReques
 		return fmt.Errorf("seat not found")
 	}
 
-	// If event ID = 1 (external), use ticketing service
-	if seat.EventID == 1 {
-		return s.releaseExternalSeat(ctx, req)
-	}
-
-	// For regular events, use database
-	err = s.seatRepo.ReleaseSeat(ctx, req.SeatID)
-	if err != nil {
-		return fmt.Errorf("failed to release seat: %w", err)
-	}
-
-	// Publish seat released event
-	event := models.SeatReleasedEvent{
-		SeatID:    req.SeatID,
-		EventID:   seat.EventID,
-		Timestamp: time.Now(),
-	}
-
-	if err := s.natsClient.Publish(models.EventSeatReleased, event); err != nil {
-		// Log error but don't fail the operation
-		logger.WithContext(ctx).Error("Failed to publish seat released event",
-			"error", err,
-			"seat_id", req.SeatID,
-			"event_id", seat.EventID,
-			"event_type", "seat.released")
-	}
-
-	return nil
-}
-
-func (s *SeatService) releaseExternalSeat(ctx context.Context, req *models.ReleaseSeatRequest) error {
-	// For external seats, we need to get the booking to get the order ID
+	// Get booking to verify ownership
 	booking, err := s.seatRepo.GetBookingBySeatID(ctx, req.SeatID)
 	if err != nil {
 		return fmt.Errorf("failed to get booking for seat: %w", err)
@@ -230,31 +116,19 @@ func (s *SeatService) releaseExternalSeat(ctx context.Context, req *models.Relea
 		return fmt.Errorf("no booking found for seat")
 	}
 
-	if booking.OrderID == nil {
-		return fmt.Errorf("external booking must have order ID")
+	// Authorization: verify user owns this booking
+	if userID, ok := middleware.UserIDFromContext(ctx); ok {
+		if booking.UserID == nil || *booking.UserID != userID {
+			return fmt.Errorf("unauthorized: booking does not belong to current user")
+		}
+	} else {
+		return fmt.Errorf("unauthorized: user not authenticated")
 	}
 
-	// For external seats, we need to map seat ID to place ID
-	placeID := req.SeatID // SeatID is already a string
-
-	err = s.ticketingClient.ReleasePlace(placeID)
+	// Release seat from database (all events use local database)
+	err = s.seatRepo.ReleaseSeat(ctx, req.SeatID)
 	if err != nil {
-		return fmt.Errorf("failed to release external place: %w", err)
-	}
-
-	// Publish seat released event
-	event := models.SeatReleasedEvent{
-		SeatID:    req.SeatID,
-		EventID:   1, // External event
-		Timestamp: time.Now(),
-	}
-
-	if err := s.natsClient.Publish(models.EventSeatReleased, event); err != nil {
-		// Log error but don't fail the operation
-		logger.WithContext(ctx).Error("Failed to publish seat released event for external seat",
-			"error", err,
-			"seat_id", req.SeatID,
-			"event_type", "seat.released")
+		return fmt.Errorf("failed to release seat: %w", err)
 	}
 
 	return nil

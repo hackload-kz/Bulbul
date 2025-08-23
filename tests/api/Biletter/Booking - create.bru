@@ -1,0 +1,22 @@
+meta {
+  name: Booking - create
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{base_url}}/api/bookings
+  body: json
+  auth: basic
+}
+
+auth:basic {
+  username: {{default_user_email}}
+  password: {{default_user_password}}
+}
+
+body:json {
+  {
+    "event_id": 1
+  }
+}

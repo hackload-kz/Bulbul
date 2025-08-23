@@ -25,23 +25,3 @@
     name: elasticsearch
     state: stopped
   become: yes
-
-- name: restart elasticsearch_exporter
-  systemd:
-    name: elasticsearch_exporter
-    state: restarted
-    daemon_reload: yes
-  become: yes
-
-- name: start elasticsearch_exporter
-  systemd:
-    name: elasticsearch_exporter
-    state: started
-    enabled: yes
-  become: yes
-
-- name: stop elasticsearch_exporter
-  systemd:
-    name: elasticsearch_exporter
-    state: stopped
-  become: yes

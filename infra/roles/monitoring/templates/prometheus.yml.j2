@@ -70,17 +70,6 @@ scrape_configs:
 {% endfor %}
     scrape_interval: {{ scrape_interval }}
     metrics_path: /metrics
-  
-  # Elasticsearch exporter metrics
-  - job_name: 'elasticsearch_exporter'
-    static_configs:
-      - targets:
-{% for host in elasticsearch_hosts %}
-        - '{{ hostvars[host]["ansible_host"] }}:{{ elasticsearch_exporter_port }}'
-{% endfor %}
-    scrape_interval: {{ scrape_interval }}
-    metrics_path: /metrics
-{% endif %}
 
   # Bulbul Application metrics
 {% if api_server_hosts %}

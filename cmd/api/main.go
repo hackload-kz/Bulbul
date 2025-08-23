@@ -13,23 +13,16 @@ import (
 	"bulbul/internal/api"
 	"bulbul/internal/config"
 	"bulbul/internal/logger"
-	"bulbul/internal/validation"
 )
 
 func main() {
-	// Проверяем, нужно ли запустить валидацию
-	if len(os.Args) > 1 && os.Args[1] == "validate" {
-		validation.RunValidation()
-		return
-	}
-
 	// Загружаем конфигурацию
 	cfg := config.Load()
 
 	// Инициализируем логгер
 	logger.Init(cfg.LogLevel, cfg.LogFormat)
 
-	slog.Info("Application starting", 
+	slog.Info("Application starting",
 		"log_level", cfg.LogLevel,
 		"log_format", cfg.LogFormat,
 		"gin_mode", cfg.GinMode)
@@ -53,12 +46,12 @@ func main() {
 
 	// Создаем HTTP сервер
 	srv := &http.Server{
-		Addr:              ":" + cfg.Port,
-		Handler:           server.GetRouter(),
-		ReadTimeout:       cfg.RequestTimeout,
-		WriteTimeout:      cfg.RequestTimeout,
-		IdleTimeout:       2 * time.Minute,
-		MaxHeaderBytes:    1 << 20, // 1MB
+		Addr:           ":" + cfg.Port,
+		Handler:        server.GetRouter(),
+		ReadTimeout:    cfg.RequestTimeout,
+		WriteTimeout:   cfg.RequestTimeout,
+		IdleTimeout:    2 * time.Minute,
+		MaxHeaderBytes: 1 << 20, // 1MB
 	}
 
 	// Запускаем сервер в отдельной горутине

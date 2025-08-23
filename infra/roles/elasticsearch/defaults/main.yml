@@ -52,10 +52,3 @@ elasticsearch_log_level: "INFO"
 # Service configuration
 elasticsearch_service_enabled: true
 elasticsearch_service_state: "started"
-
-# Monitoring configuration
-elasticsearch_exporter_enabled: true
-elasticsearch_exporter_version: "1.6.0"
-elasticsearch_exporter_port: 9114
-elasticsearch_exporter_user: "elasticsearch_exporter"
-elasticsearch_exporter_group: "elasticsearch_exporter"
