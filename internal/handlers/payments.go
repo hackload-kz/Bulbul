@@ -78,12 +78,6 @@ func (h *Handlers) InitiatePayment(c *gin.Context) {
 		return
 	}
 
-	// If payment URL is provided, redirect to payment gateway
-	if paymentURL != "" {
-		c.Header("Location", paymentURL)
-		c.Status(http.StatusFound) // 302
-	} else {
-		// For external events, no payment needed
-		c.Status(http.StatusOK)
-	}
+	c.Header("Location", paymentURL)
+	c.Status(http.StatusFound)
 }

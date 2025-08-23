@@ -27,9 +27,9 @@ export const options = {
     biletter_booking_test: {
       executor: 'per-vu-iterations',
       vus: 3,
-      iterations: 5,
-      maxDuration: '3m',
-      startTime: '10s',
+      iterations: 100, // 3 users x 1000 iterations = 3000 booking attempts
+      maxDuration: '5m',
+      startTime: '30s', // Start 30 seconds after reset
     },
   },
 };
@@ -37,14 +37,14 @@ export const options = {
 const users = [
   { email: 'aysultan_talgat_1@fest.tix', password: '/8eC$AD>' },
   { email: 'ayaulym_bazarbaeva_3@quick.pass', password: 'LDb60_%]4' },
-  { email: 'muslima_serikbaeva_999996@ticket.world', password: '_lnAio:Br7b' },
-  { email: 'ayan_asqar_999997@fest.tix', password: 'U|t,P#R~' },
+  { email: 'muslima_serikbaeva_999996@ticket.world', password: 'U|t,P#R~' },
+  { email: 'ayan_asqar_999997@fest.tix', password: '_lnAio:Br7b' },
   { email: 'kozayym_asanova_999999@hackhload.kz', password: '_^@5=[oc!)+$' },
   { email: 'alinur_aytzhanov_1000000@ticket.world', password: 'bjD[wU=u#@Wk1\ED' },
   { email: 'sofiya_karimova_999989@show.go', password: 't~bv:18I\V$@' },
   { email: 'aysha_sarsenova_999990@ticket.world', password: 'zUKhVyYs%>\Ww' },
   { email: 'medina_rakhmetova_999991@show.go', password: ')~c^V+Tx#G9' },
-  { email: 'erkenaz_smagulova_999992@quick.pass', password: 'I&R>IVB\=P)UmUM' }
+  { email: 'іnzhu_ospanova_372921@quick.pass', password: 'lLZ~Z9X+>|C&(' }
 ];
 
 function createBasicAuthHeader(user) {
