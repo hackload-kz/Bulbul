@@ -15,7 +15,7 @@ elasticsearch_discovery_type: "single-node"
 
 # Memory settings (for 16GB RAM node)
 # JVM heap should be 50% of available RAM, max 8GB
-elasticsearch_heap_size: "8g"
+elasticsearch_heap_size: "4g"
 
 # Data paths
 elasticsearch_data_path: "/var/lib/elasticsearch"

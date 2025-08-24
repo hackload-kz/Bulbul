@@ -85,7 +85,7 @@ resource "openstack_networking_port_v2" "elasticsearch_port" {
 resource "openstack_compute_instance_v2" "elasticsearch_server" {
   count = var.vms_enabled ? 1 : 0
   name        = "elasticsearch"
-  flavor_name = "d1.ram16cpu8"
+  flavor_name = "d1.ram8cpu8"
   key_pair    = openstack_compute_keypair_v2.ssh.name
 
   user_data = file("${path.module}/resources/cloud-init.yml")
