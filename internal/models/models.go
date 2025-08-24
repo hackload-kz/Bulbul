@@ -52,9 +52,9 @@ type ListEventsResponse []ListEventsResponseItem
 
 // ListBookingsResponseItem - элемент списка бронирований
 type ListBookingsResponseItem struct {
-    ID      int64 `json:"id"`
-    EventID int64 `json:"event_id"`
-    Seats   []ListSeatsResponseItem `json:"seats,omitempty"`
+	ID      int64                   `json:"id"`
+	EventID int64                   `json:"event_id"`
+	Seats   []ListSeatsResponseItem `json:"seats,omitempty"`
 }
 
 // ListBookingsResponse - список бронирований
@@ -110,4 +110,15 @@ type PaymentNotificationPayload struct {
 	TeamSlug  string                 `json:"teamSlug"`
 	Timestamp string                 `json:"timestamp"`
 	Data      map[string]interface{} `json:"data"`
+}
+
+// AnalyticsResponse - модель ответа аналитики для события
+type AnalyticsResponse struct {
+	EventID       int64  `json:"event_id"`
+	TotalSeats    int32  `json:"total_seats"`
+	SoldSeats     int32  `json:"sold_seats"`
+	ReservedSeats int32  `json:"reserved_seats"`
+	FreeSeats     int32  `json:"free_seats"`
+	TotalRevenue  string `json:"total_revenue"`
+	BookingsCount int32  `json:"bookings_count"`
 }

@@ -156,6 +156,9 @@ func (s *Server) setupRoutes() {
 		}
 	}
 
+	// Analytics endpoint
+	api.GET("/analytics", h.GetAnalytics)
+
 	// Reset endpoint (no authentication required)
 	s.router.POST("/api/reset", h.ResetDatabase)
 

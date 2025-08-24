@@ -296,3 +296,49 @@ func (r *SeatRepository) ResetAllSeats(ctx context.Context) error {
 	_, err := r.db.ExecContext(ctx, query)
 	return err
 }
+
+// GetEventAnalytics retrieves analytics data for a specific event
+func (r *SeatRepository) GetEventAnalytics(ctx context.Context, eventID int64) (*models.AnalyticsResponse, error) {
+	analytics := &models.AnalyticsResponse{EventID: eventID}
+
+	// Get seat statistics
+	seatQuery := `
+		SELECT 
+			COUNT(*) as total_seats,
+			COUNT(CASE WHEN status = 'SOLD' THEN 1 END) as sold_seats,
+			COUNT(CASE WHEN status = 'RESERVED' THEN 1 END) as reserved_seats,
+			COUNT(CASE WHEN status = 'FREE' THEN 1 END) as free_seats,
+			COALESCE(SUM(CASE WHEN status = 'SOLD' THEN price ELSE 0 END), 0) as total_revenue
+		FROM seats 
+		WHERE event_id = $1`
+
+	var totalRevenue int64
+	err := r.db.QueryRowContext(ctx, seatQuery, eventID).Scan(
+		&analytics.TotalSeats,
+		&analytics.SoldSeats,
+		&analytics.ReservedSeats,
+		&analytics.FreeSeats,
+		&totalRevenue,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert price from kopecks to rubles as decimal string
+	analytics.TotalRevenue = fmt.Sprintf("%.2f", float64(totalRevenue)/100)
+
+	// Get bookings count for the event
+	bookingQuery := `
+		SELECT COUNT(DISTINCT b.id) 
+		FROM bookings b
+		JOIN booking_seats bs ON b.id = bs.booking_id
+		JOIN seats s ON bs.seat_id = s.id
+		WHERE s.event_id = $1 AND b.status != 'CANCELLED'`
+
+	err = r.db.QueryRowContext(ctx, bookingQuery, eventID).Scan(&analytics.BookingsCount)
+	if err != nil {
+		return nil, err
+	}
+
+	return analytics, nil
+}

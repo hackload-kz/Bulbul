@@ -39,3 +39,12 @@ func (s *EventService) List(ctx context.Context, query, date string, page, pageS
 
 	return result, nil
 }
+
+func (s *EventService) GetAnalytics(ctx context.Context, eventID int64) (*models.AnalyticsResponse, error) {
+	analytics, err := s.seatRepo.GetEventAnalytics(ctx, eventID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get analytics: %w", err)
+	}
+
+	return analytics, nil
+}

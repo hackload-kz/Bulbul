@@ -75,3 +75,29 @@ func (h *Handlers) shouldCacheEventsRequest(query, date string, pageSize int) bo
 	// Only cache if pageSize is divisible by 5
 	return pageSize%5 == 0
 }
+
+// GetAnalytics - GET /api/analytics
+// Получить аналитику продаж для события
+func (h *Handlers) GetAnalytics(c *gin.Context) {
+	// Get event ID from query parameter
+	eventIDStr := c.Query("id")
+	if eventIDStr == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id parameter is required"})
+		return
+	}
+
+	eventID, err := strconv.ParseInt(eventIDStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid event id format"})
+		return
+	}
+
+	// Get analytics from service
+	analytics, err := h.services.Events.GetAnalytics(c.Request.Context(), eventID)
+	if err != nil {
+		h.handleServiceError(c, err, "Failed to get analytics")
+		return
+	}
+
+	c.JSON(http.StatusOK, analytics)
+}
