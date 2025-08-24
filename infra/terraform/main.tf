@@ -37,10 +37,6 @@ resource "openstack_networking_subnet_v2" "private_subnet" {
 
 resource "openstack_networking_floatingip_v2" "lb_fip" {
   pool = "FloatingIP Net"
-
-  lifecycle {
-    prevent_destroy = true
-  }
 }
 
 resource "openstack_networking_floatingip_v2" "monitoring_fip" {

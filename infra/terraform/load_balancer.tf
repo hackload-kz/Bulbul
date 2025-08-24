@@ -29,10 +29,6 @@ resource "openstack_compute_instance_v2" "lb" {
 resource "openstack_networking_port_v2" "lb_port" {
   network_id         = openstack_networking_network_v2.private_network.id
   security_group_ids = [openstack_networking_secgroup_v2.default_group.id]
-
-  lifecycle {
-    prevent_destroy = true
-  }
 }
 
 resource "openstack_networking_floatingip_associate_v2" "lb_fip_association" {
